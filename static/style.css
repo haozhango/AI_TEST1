@@ -1,21 +1,20 @@
 body { font-family: Arial, sans-serif; background: #f5f6f8; margin: 0; color: #222; }
-.container { max-width: 1000px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 10px; }
+.container { max-width: 1500px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 10px; }
 h1, h2 { margin: 0 0 12px; }
 .tip { margin: 0 0 16px; color: #444; background: #f0f4ff; border: 1px solid #d7e3ff; border-radius: 6px; padding: 8px 10px; }
 section { margin-bottom: 24px; }
 .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.job-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 10px; background: #fafafa; }
-label { display: block; margin-bottom: 8px; font-size: 14px; }
-input { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; }
-.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
-.full { grid-column: 1 / -1; }
-button { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; background: #0a66ff; color: #fff; }
-button.remove-btn { background: #a33; margin-top: 8px; }
+.job-card, .recent-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 10px; background: #fafafa; }
+.one-line { display: flex; gap: 10px; align-items: flex-end; overflow-x: auto; }
+label { display: inline-block; margin: 0; font-size: 12px; min-width: 150px; }
+input { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; min-width: 150px; }
+button { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; background: #0a66ff; color: #fff; white-space: nowrap; }
+button.remove-btn { background: #a33; }
 button.copy-btn { background: #666; margin-right: 8px; }
 button.stop-btn { background: #d98600; }
 .status { font-weight: bold; }
 .status.Runing { color: #0a66ff; }
 .status.Finish { color: #15803d; }
 .status.Stopped, .status.Failed { color: #a11; }
-.recent-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
 .meta { font-size: 13px; color: #555; }
+.actions { display: inline-flex; gap: 8px; align-items: center; margin-left: auto; }

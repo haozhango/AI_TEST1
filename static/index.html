@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,12 +9,12 @@
 <body>
   <main class="container">
     <h1>Job Console</h1>
-    <p class="tip">推荐使用最新版 <strong>Chrome</strong> 或 <strong>Firefox</strong> 访问本页面。</p>
+    <p class="tip">Please use the latest <strong>Chrome</strong> or <strong>Firefox</strong> for best compatibility.</p>
 
     <section>
       <div class="header-row">
         <h2>New Jobs</h2>
-        <button id="addJobBtn" type="button">+ 新增条目</button>
+        <button id="addJobBtn" type="button">+ Add Row</button>
       </div>
       <form id="newJobsForm">
         <div id="newJobsList"></div>
@@ -29,23 +29,16 @@
   </main>
 
   <template id="newJobTemplate">
-    <div class="job-card">
+    <div class="job-card one-line">
       <label>Bitfile <input name="bitfile" required /></label>
       <label>Binfile <input name="binfile" /></label>
       <label>Log Path <input name="log_path" placeholder="/tmp/job.log" /></label>
-
-      <details>
-        <summary>工具链配置</summary>
-        <div class="grid">
-          <label>UART1 <input name="uart1" /></label>
-          <label>UART2 <input name="uart2" /></label>
-          <label>UART3 <input name="uart3" /></label>
-          <label>UART4 <input name="uart4" /></label>
-          <label class="full">OpenODC Path <input name="openodc_path" placeholder="/opt/openocd/bin/openocd" /></label>
-        </div>
-      </details>
-
-      <button class="remove-btn" type="button">删除</button>
+      <label>OpenOCD Path <input name="openodc_path" placeholder="/opt/openocd/bin/openocd" /></label>
+      <label>UART1 <input name="uart1" /></label>
+      <label>UART2 <input name="uart2" /></label>
+      <label>UART3 <input name="uart3" /></label>
+      <label>UART4 <input name="uart4" /></label>
+      <button class="remove-btn" type="button">Remove</button>
     </div>
   </template>
 

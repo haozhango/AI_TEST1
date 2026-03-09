@@ -39,23 +39,23 @@ async function submitJobs(event) {
 
   if (!response.ok) {
     const text = await response.text();
-    alert(`提交失败: ${text}`);
+    alert(`Submit failed: ${text}`);
     return;
   }
 
-  alert('提交成功');
+  alert('Submitted successfully');
   newJobsList.innerHTML = '';
   createNewJobCard();
   await refreshRecentJobs();
 }
 
 async function stopJob(jobId) {
-  const yes = window.confirm('是否停止该 Job?');
+  const yes = window.confirm('Stop this job?');
   if (!yes) return;
 
   const response = await fetch(`/api/jobs/${jobId}/stop`, { method: 'POST' });
   if (!response.ok) {
-    alert('停止失败');
+    alert('Stop failed');
     return;
   }
   await refreshRecentJobs();
@@ -64,33 +64,33 @@ async function stopJob(jobId) {
 function renderRecentJobs(jobs) {
   recentJobs.innerHTML = '';
   if (!jobs.length) {
-    recentJobs.textContent = '暂无任务';
+    recentJobs.textContent = 'No jobs yet';
     return;
   }
 
   jobs.forEach((job) => {
     const item = document.createElement('div');
-    item.className = 'recent-card';
+    item.className = 'recent-card one-line';
 
     const payload = job.payload || {};
     item.innerHTML = `
-      <div><strong>Job ID:</strong> ${job.id}</div>
+      <div><strong>ID:</strong> ${job.id}</div>
       <div><strong>Bitfile:</strong> ${payload.bitfile || ''}</div>
       <div><strong>Binfile:</strong> ${payload.binfile || ''}</div>
-      <div><strong>Log Path:</strong> ${payload.log_path || ''}</div>
-      <div><strong>OpenODC:</strong> ${payload.openodc_path || ''}</div>
+      <div><strong>Log:</strong> ${payload.log_path || ''}</div>
+      <div><strong>OpenOCD:</strong> ${payload.openodc_path || ''}</div>
       <div><strong>UARTs:</strong> ${payload.uart1 || '-'} / ${payload.uart2 || '-'} / ${payload.uart3 || '-'} / ${payload.uart4 || '-'}</div>
       <div><strong>Status:</strong> <span class="status ${job.status}">${job.status}</span></div>
-      <div class="meta"><strong>提交时间:</strong> ${job.submit_time || '-'}</div>
-      <div class="meta"><strong>结束时间:</strong> ${job.end_time || '-'}</div>
-      <div class="meta"><strong>信息:</strong> ${job.message || '-'}</div>
+      <div class="meta"><strong>Submitted:</strong> ${job.submit_time || '-'}</div>
+      <div class="meta"><strong>Ended:</strong> ${job.end_time || '-'}</div>
+      <div class="meta"><strong>Message:</strong> ${job.message || '-'}</div>
     `;
 
     const actions = document.createElement('div');
-    actions.style.marginTop = '8px';
+    actions.className = 'actions';
 
     const copyBtn = document.createElement('button');
-    copyBtn.textContent = 'Copy 到 New Jobs';
+    copyBtn.textContent = 'Copy to New Jobs';
     copyBtn.className = 'copy-btn';
     copyBtn.type = 'button';
     copyBtn.addEventListener('click', () => createNewJobCard(payload));
