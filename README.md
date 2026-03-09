@@ -22,20 +22,90 @@
 12. Recent Jobs 记录提交时间与结束时间。
 13. Recent Jobs 支持 Copy 到 New Jobs。
 
-## 本地运行
+## 你在自己环境上如何运行（推荐步骤）
+
+> 以下步骤适用于 Linux（CentOS 7 / Ubuntu / Debian 都可，命令略有差异）。
+
+### 1) 准备代码
+
+```bash
+git clone <你的仓库地址>
+cd AI_TEST
+```
+
+### 2) 安装 Python 3 与 venv
+
+- CentOS 7（常见命令）：
+
+```bash
+sudo yum install -y epel-release
+sudo yum install -y python3 python3-pip
+```
+
+- Ubuntu / Debian：
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip
+```
+
+### 3) 创建虚拟环境并安装依赖
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+pip install --upgrade pip
 pip install fastapi uvicorn
+```
+
+### 4) 启动服务
+
+```bash
 uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-## 浏览器访问（Chrome / Firefox）
+看到类似 `Uvicorn running on http://0.0.0.0:8000` 即启动成功。
+
+### 5) 浏览器访问（Chrome / Firefox）
 
 - 在服务所在机器打开：`http://127.0.0.1:8000`
 - 在局域网其他机器打开：`http://<服务器IP>:8000`
 - 推荐使用最新版 **Google Chrome** 或 **Mozilla Firefox**
+
+### 6) 基础检查（可选）
+
+```bash
+curl http://127.0.0.1:8000/api/jobs
+```
+
+正常会返回 JSON，例如：`{"jobs":[]}`。
+
+---
+
+## 常见问题
+
+### Q1: `python3: command not found`
+
+说明系统未安装 Python3，按上面的系统命令先安装。
+
+### Q2: `No module named fastapi`
+
+说明你没有在虚拟环境里安装依赖，重新执行：
+
+```bash
+source .venv/bin/activate
+pip install fastapi uvicorn
+```
+
+### Q3: 局域网其它机器访问不到
+
+请检查：
+
+1. 服务是否用 `--host 0.0.0.0` 启动；
+2. 服务器防火墙是否放行 8000 端口；
+3. 访问的是正确的服务器 IP。
+
+---
 
 ## API
 
