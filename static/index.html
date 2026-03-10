@@ -3,17 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Job Console</title>
+  <title>HAPS Jobs Console Platform</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <main class="container">
-    <h1>Job Console</h1>
+    <h1>HAPS Jobs Console Platform</h1>
 
     <section class="panel panel-new">
       <div class="header-row">
         <h2>Create Jobs</h2>
-        <button id="addJobBtn" type="button">New</button>
       </div>
       <form id="newJobsForm">
         <div id="newJobsList"></div>
@@ -50,7 +49,10 @@
         <span class="key">Binfile</span>
         <div class="inline-control">
           <input name="binfile" class="binfile-path" placeholder="/path/to/xxx.bin" />
-          <button type="button" class="mini-btn browse-btn">Browse</button>
+          <div class="dropdown-wrap">
+            <button type="button" class="mini-btn browse-btn">Browse ▾</button>
+            <div class="directory-menu hidden"></div>
+          </div>
         </div>
       </label>
 
@@ -69,7 +71,10 @@
         <div class="uart-list"></div>
       </div>
 
-      <button class="remove-btn" type="button" title="Delete item">×</button>
+      <div class="row-actions">
+        <button class="minus-btn" type="button" title="Delete item">−</button>
+        <button class="plus-btn" type="button" title="Add next item">＋</button>
+      </div>
     </div>
   </template>
 

@@ -149,6 +149,27 @@ class JobManager:
         }
 
 
+
+
+def build_log_info(log_path: str) -> str:
+    path_text = (log_path or "").strip()
+    if not path_text:
+        return ""
+
+    source = Path(path_text)
+    directory = source if source.is_dir() else source.parent
+    if not directory.exists() or not directory.is_dir():
+        return ""
+
+    files = sorted([entry.name for entry in directory.iterdir() if entry.is_file() and entry.suffix.lower() in {".log", ".txt"}])
+    if not files:
+        return f"No log files in {directory}"
+
+    preview = ", ".join(files[:3])
+    if len(files) > 3:
+        preview += f" ... (+{len(files)-3} more)"
+    return f"{directory}: {preview}"
+
 def build_jobs_id(jobs_id: str) -> str:
     if jobs_id.strip():
         return jobs_id
@@ -157,7 +178,7 @@ def build_jobs_id(jobs_id: str) -> str:
     return f"{user}_{ts}"
 
 
-app = FastAPI(title="Job Console")
+app = FastAPI(title="HAPS Jobs Console Platform")
 app.mount("/static", StaticFiles(directory=APP_ROOT / "static"), name="static")
 manager = JobManager()
 
@@ -174,6 +195,33 @@ def get_session() -> dict[str, str]:
     return {"user": os.getenv("USER") or "user"}
 
 
+
+
+@app.get("/api/directories")
+def get_directories() -> dict[str, list[str]]:
+    bases = [Path.home(), APP_ROOT]
+    found: list[str] = []
+    for base in bases:
+        if not base.exists() or not base.is_dir():
+            continue
+        found.append(str(base))
+        for child in sorted(base.iterdir()):
+            if child.is_dir():
+                found.append(str(child))
+            if len(found) >= 20:
+                break
+        if len(found) >= 20:
+            break
+    # de-duplicate while keeping order
+    seen = set()
+    dedup = []
+    for item in found:
+        if item not in seen:
+            seen.add(item)
+            dedup.append(item)
+    return {"directories": dedup[:20]}
+
+
 @app.get("/api/jobs")
 def get_jobs() -> dict[str, Any]:
     return {"jobs": manager.list_jobs()}
@@ -188,6 +236,7 @@ def submit_jobs(request: SubmitJobsRequest) -> dict[str, Any]:
     for item in request.jobs:
         data = json.loads(item.model_dump_json())
         data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""))
+        data["log_info"] = build_log_info(data.get("log_path", ""))
 
         bitfile_mode = data.get("bitfile_mode", "path")
         bitfile_value = data.get("bitfile", "").strip()
