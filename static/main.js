@@ -211,9 +211,31 @@ function bindDbConfigToggles(card, prefill = {}) {
   });
 }
 
-function createNewJobCard(prefill = {}, insertAfterNode = null) {
+function normalizeUartPaths(prefill = {}) {
+  const normalizeList = (values) => values.map((value) => String(value || '').trim()).filter(Boolean);
+
+  if (Array.isArray(prefill.uart_paths)) return normalizeList(prefill.uart_paths);
+
+  if (typeof prefill.uart_paths === 'string') {
+    const text = prefill.uart_paths.trim();
+    if (!text) return [];
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) return normalizeList(parsed);
+    } catch (_) {}
+    return text.split(/[\n,;]/).map((item) => item.trim()).filter(Boolean);
+  }
+
+  if (typeof prefill.uart_path === 'string' && prefill.uart_path.trim()) return [prefill.uart_path.trim()];
+  if (typeof prefill.uart === 'string' && prefill.uart.trim()) return [prefill.uart.trim()];
+  return [];
+}
+
+function createNewJobCard(prefill = {}, insertAfterNode = null, options = {}) {
   const node = template.content.firstElementChild.cloneNode(true);
-  node.querySelector('input[name="jobs_id"]').value = prefill.jobs_id || makeJobsId();
+  const normalizedUartPaths = normalizeUartPaths(prefill);
+
+  node.querySelector('input[name="jobs_id"]').value = options.regenerateJobsId ? makeJobsId() : (prefill.jobs_id || makeJobsId());
   node.querySelector('select[name="haps_platform"]').value = prefill.haps_platform || 'BJ-HAPS80';
   node.querySelector('input[name="database_path"]').value = prefill.database_path && prefill.database_path !== 'auto' ? prefill.database_path : '';
   node.querySelector('input[name="reset_script"]').value = prefill.reset_script && prefill.reset_script !== 'auto' ? prefill.reset_script : '';
@@ -226,7 +248,7 @@ function createNewJobCard(prefill = {}, insertAfterNode = null) {
   node.querySelector('input[name="openocd_tool_path"]').value = openocdCfg.tool_path || '';
   node.querySelector('input[name="openocd_cfg_file"]').value = openocdCfg.cfg_file || '';
 
-  (prefill.uart_paths || ['']).forEach((val) => addUartItem(node, val));
+  (normalizedUartPaths.length ? normalizedUartPaths : ['']).forEach((val) => addUartItem(node, val));
 
   node.querySelector('.add-uart-btn').addEventListener('click', () => addUartItem(node));
   node.querySelector('.delete-btn').addEventListener('click', () => {
@@ -311,7 +333,7 @@ function renderRecentJobs(jobs) {
     copyBtn.textContent = 'Copy to New Jobs';
     copyBtn.className = 'copy-btn';
     copyBtn.type = 'button';
-    copyBtn.addEventListener('click', () => createNewJobCard(payload));
+    copyBtn.addEventListener('click', () => createNewJobCard(payload, null, { regenerateJobsId: true }));
     actions.appendChild(copyBtn);
 
     if (job.status === 'Runing') {

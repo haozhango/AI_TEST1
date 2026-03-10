@@ -140,9 +140,11 @@ class JobManager:
 
     def list_jobs(self) -> list[dict[str, Any]]:
         with self._lock:
+            self._prune_jobs_locked()
             return [self._to_api(self._jobs[job_id]) for job_id in self._order]
 
     def _prune_jobs_locked(self) -> None:
+        self._order = [job_id for job_id in self._order if job_id in self._jobs]
         overflow = self._order[self.MAX_RECENT_JOBS :]
         if not overflow:
             return
