@@ -203,8 +203,12 @@ function updateDbConfigState(card, key, enabled) {
 function bindDbConfigToggles(card, prefill = {}) {
   card.querySelectorAll('.db-config-toggle').forEach((toggle) => {
     const key = toggle.dataset.target;
+    const enabledFlagKey = `${key}_enabled`;
+    if (typeof prefill[enabledFlagKey] === 'boolean') {
+      toggle.checked = prefill[enabledFlagKey];
+    }
     const initialValue = prefill[key];
-    if (initialValue === 'auto') toggle.checked = false;
+    if (typeof prefill[enabledFlagKey] !== 'boolean' && initialValue === 'auto') toggle.checked = false;
 
     updateDbConfigState(card, key, toggle.checked);
     toggle.addEventListener('change', () => updateDbConfigState(card, key, toggle.checked));
@@ -228,6 +232,12 @@ function normalizeUartPaths(prefill = {}) {
 
   if (typeof prefill.uart_path === 'string' && prefill.uart_path.trim()) return [prefill.uart_path.trim()];
   if (typeof prefill.uart === 'string' && prefill.uart.trim()) return [prefill.uart.trim()];
+
+  const legacyUartValues = ['uart1', 'uart2', 'uart3', 'uart4', 'uart_1', 'uart_2', 'uart_3', 'uart_4']
+    .map((key) => prefill[key])
+    .filter((value) => typeof value === 'string' && value.trim());
+  if (legacyUartValues.length) return normalizeList(legacyUartValues);
+
   return [];
 }
 
@@ -274,12 +284,18 @@ function createNewJobCard(prefill = {}, insertAfterNode = null, options = {}) {
 function collectNewJobs() {
   return Array.from(newJobsList.querySelectorAll('.job-card')).map((card) => {
     const uartPaths = Array.from(card.querySelectorAll('.uart-input')).map((i) => i.value.trim()).filter(Boolean);
+    const dbPathEnabled = card.querySelector('.db-config-toggle[data-target="database_path"]').checked;
+    const resetScriptEnabled = card.querySelector('.db-config-toggle[data-target="reset_script"]').checked;
+    const imgLoadScriptEnabled = card.querySelector('.db-config-toggle[data-target="imgload_script"]').checked;
     return {
       jobs_id: card.querySelector('input[name="jobs_id"]').value.trim(),
       haps_platform: card.querySelector('select[name="haps_platform"]').value,
-      database_path: card.querySelector('.db-config-toggle[data-target="database_path"]').checked ? (card.querySelector('input[name="database_path"]').value.trim() || 'auto') : 'auto',
-      reset_script: card.querySelector('.db-config-toggle[data-target="reset_script"]').checked ? (card.querySelector('input[name="reset_script"]').value.trim() || 'auto') : 'auto',
-      imgload_script: card.querySelector('.db-config-toggle[data-target="imgload_script"]').checked ? (card.querySelector('input[name="imgload_script"]').value.trim() || 'auto') : 'auto',
+      database_path: dbPathEnabled ? (card.querySelector('input[name="database_path"]').value.trim() || 'auto') : 'auto',
+      database_path_enabled: dbPathEnabled,
+      reset_script: resetScriptEnabled ? (card.querySelector('input[name="reset_script"]').value.trim() || 'auto') : 'auto',
+      reset_script_enabled: resetScriptEnabled,
+      imgload_script: imgLoadScriptEnabled ? (card.querySelector('input[name="imgload_script"]').value.trim() || 'auto') : 'auto',
+      imgload_script_enabled: imgLoadScriptEnabled,
       binfile: card.querySelector('input[name="binfile"]').value.trim(),
       img_file: card.querySelector('input[name="img_file"]').value.trim(),
       log_path: card.querySelector('input[name="log_path"]').value.trim(),

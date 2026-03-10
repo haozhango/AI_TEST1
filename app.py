@@ -27,8 +27,11 @@ class JobInput(BaseModel):
     jobs_id: str = ""
     haps_platform: str = "BJ-HAPS80"
     database_path: str = "auto"
+    database_path_enabled: bool = True
     reset_script: str = "auto"
+    reset_script_enabled: bool = True
     imgload_script: str = "auto"
+    imgload_script_enabled: bool = True
     binfile: str = ""
     img_file: str = ""
     log_path: str = ""
