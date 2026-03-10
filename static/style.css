@@ -59,21 +59,22 @@ button { padding: 9px 12px; border: none; border-radius: 7px; cursor: pointer; b
 .copy-btn { background: #475467; }
 .finish-btn { background: #b54708; }
 
-.row-actions { display: flex; flex-direction: column; justify-content: end; gap: 6px; }
-.minus-btn, .plus-btn { font-size: 22px; font-weight: 800; line-height: 1; padding: 4px 10px; }
-.minus-btn { background: #b42318; color: #fff; }
-.plus-btn { background: #15803d; color: #fff; }
+.row-actions { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.minus-btn, .plus-btn { font-size: 26px; font-weight: 800; line-height: 1; padding: 0; background: transparent; border-radius: 0; min-height: auto; }
+.minus-btn { color: #b42318; }
+.plus-btn { color: #15803d; }
 
 .uart-list { display: grid; gap: 6px; }
 .uart-item { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
 .remove-uart-btn { background: #7a271a; padding: 6px 8px; }
 
-.actions { display: flex; align-items: end; gap: 8px; }
+.actions { display: flex; align-items: center; gap: 8px; }
 .status.Runing { color: #0a66ff; font-weight: 700; }
 .status.Finish { color: #15803d; font-weight: 700; }
 .status.Stopped, .status.Failed { color: #a11; font-weight: 700; }
 .status-kv .val { display: flex; align-items: center; justify-content: center; text-align: center; }
-.jobid-kv .jobid-val { width: auto; min-width: 90px; align-self: flex-start; white-space: nowrap; }
+.jobid-kv .key, .jobid-kv .jobid-val { width: 100%; }
+.jobid-kv .jobid-val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .dropdown-wrap { position: relative; }
 .directory-menu {
@@ -102,3 +103,5 @@ button { padding: 9px 12px; border: none; border-radius: 7px; cursor: pointer; b
 }
 .directory-option:hover { background: #eef5ff; }
 .hidden { display: none; }
+
+.browse-btn { min-width: 38px; padding: 8px 10px; font-size: 16px; font-weight: 800; }
