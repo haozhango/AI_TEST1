@@ -42,7 +42,13 @@ h1, h2 { margin: 0 0 12px; }
   margin-bottom: 6px;
   font-size: 12px;
 }
-.panel-recent .key { background: #ffb3ad; color: #7a1f16; }
+.panel-recent .key {
+  background: #ffb3ad;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .panel-recent .val { font-size: 14px; }
 .panel-recent .kv .key, .panel-recent .kv .val { min-height: 38px; box-sizing: border-box; width: 100%; }
 .key-btn { border: none; cursor: pointer; }

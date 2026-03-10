@@ -52,6 +52,8 @@ class JobRecord:
 
 
 class JobManager:
+    MAX_RECENT_JOBS = 10
+
     def __init__(self) -> None:
         self._jobs: dict[str, JobRecord] = {}
         self._order: list[str] = []
@@ -88,6 +90,7 @@ class JobManager:
         with self._lock:
             self._jobs[job.id] = job
             self._order.insert(0, job.id)
+            self._prune_jobs_locked()
 
         threading.Thread(target=self._watch_job, args=(job.id,), daemon=True).start()
         return job
@@ -138,6 +141,15 @@ class JobManager:
     def list_jobs(self) -> list[dict[str, Any]]:
         with self._lock:
             return [self._to_api(self._jobs[job_id]) for job_id in self._order]
+
+    def _prune_jobs_locked(self) -> None:
+        overflow = self._order[self.MAX_RECENT_JOBS :]
+        if not overflow:
+            return
+
+        for job_id in overflow:
+            self._jobs.pop(job_id, None)
+        del self._order[self.MAX_RECENT_JOBS :]
 
     @staticmethod
     def _to_api(job: JobRecord) -> dict[str, Any]:
