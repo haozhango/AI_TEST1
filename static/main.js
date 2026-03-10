@@ -40,7 +40,7 @@ function ensureFileBrowserModal() {
       </div>
       <div class="file-browser-list"></div>
       <div class="file-browser-actions">
-        <button type="button" class="mini-btn file-browser-use-path">Use This Path</button>
+        <button type="button" class="mini-btn file-browser-use-path">Apply</button>
         <button type="button" class="mini-btn file-browser-cancel">Cancel</button>
       </div>
     </div>
