@@ -21,36 +21,104 @@ function addUartItem(card, value = '') {
   uartList.appendChild(item);
 }
 
-async function browseViaFileSystem(target, mode = 'file') {
-  if (mode === 'directory' && window.showDirectoryPicker) {
-    try {
-      const handle = await window.showDirectoryPicker();
-      target.value = handle.name;
-      return;
-    } catch (_) {
-      return;
-    }
-  }
+let fileBrowserModal = null;
 
-  if (window.showOpenFilePicker) {
-    try {
-      const [handle] = await window.showOpenFilePicker({ multiple: false });
-      if (handle) target.value = handle.name;
-      return;
-    } catch (_) {
-      return;
-    }
-  }
+function ensureFileBrowserModal() {
+  if (fileBrowserModal) return fileBrowserModal;
 
-  const chooser = document.createElement('input');
-  chooser.type = 'file';
-  if (mode === 'directory') chooser.setAttribute('webkitdirectory', '');
-  chooser.addEventListener('change', () => {
-    if (!chooser.files || !chooser.files.length) return;
-    const file = chooser.files[0];
-    target.value = file.webkitRelativePath || file.name;
+  const overlay = document.createElement('div');
+  overlay.className = 'file-browser-overlay';
+  overlay.innerHTML = `
+    <div class="file-browser-modal">
+      <div class="file-browser-head">
+        <strong>Select Path</strong>
+        <button type="button" class="file-browser-close">×</button>
+      </div>
+      <div class="file-browser-path-row">
+        <input class="file-browser-path" readonly />
+      </div>
+      <div class="file-browser-list"></div>
+      <div class="file-browser-actions">
+        <button type="button" class="mini-btn file-browser-cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.style.display = 'none';
+
+  const close = () => {
+    overlay.style.display = 'none';
+    overlay.dataset.mode = '';
+    overlay.dataset.targetInput = '';
+  };
+
+  overlay.querySelector('.file-browser-close').addEventListener('click', close);
+  overlay.querySelector('.file-browser-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) close();
   });
-  chooser.click();
+
+  fileBrowserModal = {
+    overlay,
+    pathInput: overlay.querySelector('.file-browser-path'),
+    list: overlay.querySelector('.file-browser-list'),
+    close,
+  };
+  return fileBrowserModal;
+}
+
+async function loadFsEntries(path, mode) {
+  const url = `/api/fs?path=${encodeURIComponent(path || '')}&mode=${encodeURIComponent(mode)}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'load failed');
+  }
+  return response.json();
+}
+
+async function browseViaFileSystem(target, mode = 'file') {
+  const modal = ensureFileBrowserModal();
+  modal.overlay.style.display = 'flex';
+  modal.overlay.dataset.mode = mode;
+  modal.overlay.dataset.targetInput = target.name || target.className;
+
+  const render = async (path) => {
+    modal.list.innerHTML = 'Loading...';
+    const data = await loadFsEntries(path || target.value || '', mode);
+    modal.pathInput.value = data.cwd;
+
+    const items = [];
+    if (data.parent) {
+      items.push(`<button type="button" class="fs-item fs-nav" data-path="${data.parent}" data-type="directory">..</button>`);
+    }
+
+    data.entries.forEach((entry) => {
+      const icon = entry.type === 'directory' ? '📁' : '📄';
+      items.push(`<button type="button" class="fs-item" data-path="${entry.path}" data-type="${entry.type}">${icon} ${entry.name}</button>`);
+    });
+
+    modal.list.innerHTML = items.join('') || '<div class="fs-empty">(empty)</div>';
+
+    modal.list.querySelectorAll('.fs-item').forEach((item) => {
+      item.addEventListener('click', async () => {
+        const itemPath = item.dataset.path || '';
+        const itemType = item.dataset.type;
+        if (itemType === 'directory') {
+          await render(itemPath);
+          return;
+        }
+        target.value = itemPath;
+        modal.close();
+      });
+    });
+  };
+
+  try {
+    await render(target.value);
+  } catch (error) {
+    modal.list.innerHTML = `<div class="fs-error">Failed: ${error.message}</div>`;
+  }
 }
 
 function bindFileSystemBrowse(card, btnSelector, inputSelector, mode = 'file') {
@@ -113,7 +181,7 @@ function createNewJobCard(prefill = {}, insertAfterNode = null) {
 
   bindFileSystemBrowse(node, '.browse-btn', '.binfile-path', 'file');
   bindFileSystemBrowse(node, '.img-file-browse-btn', '.img-file-path', 'file');
-  bindFileSystemBrowse(node, '.database-browse-btn', '.database-path', 'directory');
+  bindFileSystemBrowse(node, '.database-browse-btn', '.database-path', 'file');
   bindFileSystemBrowse(node, '.reset-browse-btn', '.reset-script-path', 'file');
   bindFileSystemBrowse(node, '.imgload-browse-btn', '.imgload-script-path', 'file');
   bindDbConfigToggles(node, prefill);

@@ -236,6 +236,38 @@ def get_directories() -> dict[str, list[str]]:
     return {"directories": dedup[:20]}
 
 
+@app.get("/api/fs")
+def get_fs_entries(path: str = "", mode: str = "file") -> dict[str, Any]:
+    target = Path(path).expanduser() if path else Path.home()
+    try:
+        resolved = target.resolve()
+    except OSError:
+        raise HTTPException(status_code=400, detail="invalid path")
+
+    if not resolved.exists() or not resolved.is_dir():
+        raise HTTPException(status_code=400, detail="path is not a directory")
+
+    entries: list[dict[str, str]] = []
+    try:
+        for entry in sorted(resolved.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())):
+            if entry.is_dir():
+                entries.append({"name": entry.name, "path": str(entry), "type": "directory"})
+            elif mode == "file" and entry.is_file():
+                entries.append({"name": entry.name, "path": str(entry), "type": "file"})
+            if len(entries) >= 200:
+                break
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="permission denied")
+
+    parent = str(resolved.parent) if resolved.parent != resolved else ""
+    return {
+        "cwd": str(resolved),
+        "parent": parent,
+        "mode": mode,
+        "entries": entries,
+    }
+
+
 @app.get("/api/jobs")
 def get_jobs() -> dict[str, Any]:
     return {"jobs": manager.list_jobs()}

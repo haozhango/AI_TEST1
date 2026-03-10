@@ -99,3 +99,56 @@ button { padding: 9px 12px; border: none; border-radius: 7px; cursor: pointer; b
 .database-field .inline-control { grid-template-columns: 24px 1fr auto; }
 .config-toggle { display: inline-flex; align-items: center; justify-content: center; margin: 0; }
 .config-toggle input { width: 16px; min-height: 16px; height: 16px; margin: 0; }
+
+.file-browser-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.file-browser-modal {
+  width: min(760px, 92vw);
+  max-height: 80vh;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 8px;
+  padding: 10px;
+}
+.file-browser-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.file-browser-close {
+  background: transparent;
+  color: #333;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0 6px;
+}
+.file-browser-list {
+  border: 1px solid #d6dbe8;
+  border-radius: 8px;
+  overflow: auto;
+  min-height: 240px;
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+.fs-item {
+  text-align: left;
+  background: #f8fafc;
+  color: #111827;
+}
+.fs-item:hover { background: #e2e8f0; }
+.fs-empty, .fs-error { padding: 8px; color: #6b7280; }
+.file-browser-actions {
+  display: flex;
+  justify-content: flex-end;
+}
