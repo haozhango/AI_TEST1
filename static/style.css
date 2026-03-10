@@ -5,7 +5,7 @@
   --new-border: #b8d2ff;
   --recent-border: #ffd3b3;
   --key-bg: #1f3a8a;
-  --key-bg-recent: #9a3412;
+  --key-bg-recent: #b35a3a;
 }
 
 body { font-family: Arial, sans-serif; background: var(--bg); margin: 0; color: #222; }
@@ -37,6 +37,7 @@ h1, h2 { margin: 0 0 12px; }
   font-size: 12px;
 }
 .panel-recent .key { background: var(--key-bg-recent); }
+.panel-recent .val { font-size: 14px; }
 .key-btn { border: none; cursor: pointer; }
 
 input, select, .val {
@@ -51,24 +52,26 @@ input, select, .val {
 .val { background: #f9fafb; }
 
 .inline-control { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+.dropdown-wrap { position: relative; }
 .stacked { display: grid; grid-template-rows: 1fr 1fr; gap: 6px; }
 
 button { padding: 9px 12px; border: none; border-radius: 7px; cursor: pointer; background: #0a66ff; color: #fff; white-space: nowrap; }
 .mini-btn { padding: 8px 10px; }
+.browse-btn, .database-browse-btn, .reset-browse-btn { background: #dbeafe; color: #1d4ed8; font-size: 16px; font-weight: 700; }
 .mini-btn.active { background: #0b8f4d; }
-.copy-btn { background: #475467; }
+.copy-btn { background: #dcfce7; color: #166534; }
 .finish-btn { background: #b54708; }
 
-.row-actions { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
-.minus-btn, .plus-btn { font-size: 26px; font-weight: 800; line-height: 1; padding: 0; background: transparent; border-radius: 0; min-height: auto; }
-.minus-btn { color: #b42318; }
-.plus-btn { color: #15803d; }
+.row-actions { display: flex; align-items: flex-start; justify-content: flex-start; gap: 8px; }
+.delete-btn, .add-btn { font-size: 24px; font-weight: 400; line-height: 1; padding: 0; background: transparent; border-radius: 0; min-height: auto; }
+.delete-btn { color: #dc2626; }
+.add-btn { color: #16a34a; }
 
 .uart-list { display: grid; gap: 6px; }
 .uart-item { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
-.remove-uart-btn { background: #7a271a; padding: 6px 8px; }
+.remove-uart-btn { background: transparent; color: #dc2626; font-size: 22px; font-weight: 700; padding: 0 6px; }
 
-.actions { display: flex; align-items: center; gap: 8px; }
+.actions { display: flex; align-items: center; justify-content: space-evenly; gap: 10px; }
 .status.Runing { color: #0a66ff; font-weight: 700; }
 .status.Finish { color: #15803d; font-weight: 700; }
 .status.Stopped, .status.Failed { color: #a11; font-weight: 700; }
@@ -104,4 +107,4 @@ button { padding: 9px 12px; border: none; border-radius: 7px; cursor: pointer; b
 .directory-option:hover { background: #eef5ff; }
 .hidden { display: none; }
 
-.browse-btn { min-width: 38px; padding: 8px 10px; font-size: 16px; font-weight: 800; }
+.browse-btn, .database-browse-btn, .reset-browse-btn { min-width: 38px; padding: 8px 10px; font-size: 16px; font-weight: 800; }

@@ -26,8 +26,8 @@ class OpenOcdCfgInput(BaseModel):
 class JobInput(BaseModel):
     jobs_id: str = ""
     haps_platform: str = "BJ-HAPS80"
-    bitfile_mode: Literal["latest", "path"] = "path"
-    bitfile: str = ""
+    database_path: str = "auto"
+    reset_script: str = "auto"
     binfile: str = ""
     log_path: str = ""
     openocd_cfg: OpenOcdCfgInput = Field(default_factory=OpenOcdCfgInput)
@@ -238,18 +238,7 @@ def submit_jobs(request: SubmitJobsRequest) -> dict[str, Any]:
         data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""))
         data["log_info"] = build_log_info(data.get("log_path", ""))
 
-        bitfile_mode = data.get("bitfile_mode", "path")
-        bitfile_value = data.get("bitfile", "").strip()
-        if bitfile_mode == "path" and not bitfile_value:
-            continue
-
-        if bitfile_mode == "latest":
-            data["bitfile"] = "GET_LATEST"
-
         created.append(manager._to_api(manager.submit(data)))
-
-    if not created:
-        raise HTTPException(status_code=400, detail="at least one job needs valid bitfile")
 
     return {"created": created}
 
