@@ -2,9 +2,9 @@ const newJobsList = document.getElementById('newJobsList');
 const template = document.getElementById('newJobTemplate');
 const uartTemplate = document.getElementById('uartTemplate');
 const recentJobs = document.getElementById('recentJobs');
-const addJobBtn = document.getElementById('addJobBtn');
 const form = document.getElementById('newJobsForm');
 let currentUser = 'user';
+let directoryOptions = [];
 
 function makeJobsId() {
   const now = new Date();
@@ -44,20 +44,46 @@ function bindBitfileLogic(card, prefill = {}) {
   render();
 }
 
+function closeAllDirectoryMenus() {
+  document.querySelectorAll('.directory-menu').forEach((menu) => menu.classList.add('hidden'));
+}
+
 function bindBinfileBrowse(card) {
   const btn = card.querySelector('.browse-btn');
   const target = card.querySelector('.binfile-path');
-  btn.addEventListener('click', () => {
-    const picker = document.createElement('input');
-    picker.type = 'file';
-    picker.onchange = () => {
-      if (picker.files && picker.files[0]) target.value = picker.files[0].name;
-    };
-    picker.click();
+  const menu = card.querySelector('.directory-menu');
+
+  function renderMenu() {
+    menu.innerHTML = '';
+    directoryOptions.forEach((path) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'directory-option';
+      option.textContent = path;
+      option.addEventListener('click', () => {
+        target.value = path;
+        menu.classList.add('hidden');
+      });
+      menu.appendChild(option);
+    });
+  }
+
+  renderMenu();
+
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const hidden = menu.classList.contains('hidden');
+    closeAllDirectoryMenus();
+    if (hidden) {
+      renderMenu();
+      menu.classList.remove('hidden');
+    }
   });
+
+  menu.addEventListener('click', (event) => event.stopPropagation());
 }
 
-function createNewJobCard(prefill = {}) {
+function createNewJobCard(prefill = {}, insertAfterNode = null) {
   const node = template.content.firstElementChild.cloneNode(true);
   node.querySelector('input[name="jobs_id"]').value = prefill.jobs_id || makeJobsId();
   node.querySelector('select[name="haps_platform"]').value = prefill.haps_platform || 'BJ-HAPS80';
@@ -72,14 +98,20 @@ function createNewJobCard(prefill = {}) {
   (prefill.uart_paths || ['']).forEach((val) => addUartItem(node, val));
 
   node.querySelector('.add-uart-btn').addEventListener('click', () => addUartItem(node));
-  node.querySelector('.remove-btn').addEventListener('click', () => {
+  node.querySelector('.minus-btn').addEventListener('click', () => {
     node.remove();
     if (!newJobsList.children.length) createNewJobCard();
   });
+  node.querySelector('.plus-btn').addEventListener('click', () => createNewJobCard({}, node));
 
   bindBitfileLogic(node, prefill);
   bindBinfileBrowse(node);
-  newJobsList.appendChild(node);
+
+  if (insertAfterNode && insertAfterNode.parentNode === newJobsList) {
+    insertAfterNode.insertAdjacentElement('afterend', node);
+  } else {
+    newJobsList.appendChild(node);
+  }
 }
 
 function collectNewJobs() {
@@ -131,10 +163,10 @@ function renderRecentJobs(jobs) {
     const item = document.createElement('div');
     item.className = 'recent-card row-grid';
     item.innerHTML = `
-      <div class="kv"><span class="key">JobsID</span><span class="val">${payload.jobs_id || '-'}</span></div>
-      <div class="kv"><span class="key">Status</span><span class="val status ${job.status}">${job.status}</span></div>
+      <div class="kv jobid-kv"><span class="key">JobsID</span><span class="val jobid-val">${payload.jobs_id || '-'}</span></div>
+      <div class="kv status-kv"><span class="key">Status</span><span class="val status ${job.status}">${job.status}</span></div>
       <div class="kv"><span class="key">Endtime</span><span class="val">${job.end_time || '-'}</span></div>
-      <div class="kv"><span class="key">Log Path</span><span class="val">${payload.log_path || '-'}</span></div>
+      <div class="kv"><span class="key">Log Info</span><span class="val">${payload.log_info || '-'}</span></div>
       <div class="actions"></div>
     `;
 
@@ -167,15 +199,23 @@ async function refreshRecentJobs() {
 }
 
 async function bootstrap() {
+  document.addEventListener('click', closeAllDirectoryMenus);
   try {
-    const resp = await fetch('/api/session');
-    if (resp.ok) currentUser = (await resp.json()).user || 'user';
+    const sessionResp = await fetch('/api/session');
+    if (sessionResp.ok) currentUser = (await sessionResp.json()).user || 'user';
   } catch (_) {}
+
+  try {
+    const dirResp = await fetch('/api/directories');
+    if (dirResp.ok) directoryOptions = (await dirResp.json()).directories || [];
+  } catch (_) {
+    directoryOptions = [];
+  }
+
   createNewJobCard();
   refreshRecentJobs();
   setInterval(refreshRecentJobs, 2000);
 }
 
-addJobBtn.addEventListener('click', () => createNewJobCard());
 form.addEventListener('submit', submitJobs);
 bootstrap();
