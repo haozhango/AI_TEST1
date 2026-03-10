@@ -22,49 +22,49 @@ function addUartItem(card, value = '') {
   uartList.appendChild(item);
 }
 
-function bindBitfileLogic(card, prefill = {}) {
-  const input = card.querySelector('.bitfile-path');
-  const latestBtn = card.querySelector('.latest-btn');
-  let mode = prefill.bitfile === 'GET_LATEST' ? 'latest' : (prefill.bitfile_mode || 'path');
-
-  function render() {
-    const isLatest = mode === 'latest';
-    latestBtn.classList.toggle('active', isLatest);
-    latestBtn.textContent = isLatest ? 'Using Latest' : 'Get Latest';
-    input.disabled = isLatest;
-    if (isLatest) input.value = '';
-  }
-
-  latestBtn.addEventListener('click', () => {
-    mode = mode === 'latest' ? 'path' : 'latest';
-    render();
-  });
-
-  card._getBitfileMode = () => mode;
-  render();
-}
-
 function closeAllDirectoryMenus() {
   document.querySelectorAll('.directory-menu').forEach((menu) => menu.classList.add('hidden'));
 }
 
-function bindBinfileBrowse(card) {
-  const btn = card.querySelector('.browse-btn');
-  const target = card.querySelector('.binfile-path');
-  const menu = card.querySelector('.directory-menu');
+function bindPathBrowse(card, btnSelector, inputSelector, menuSelector, includeAuto = true) {
+  const btn = card.querySelector(btnSelector);
+  const target = card.querySelector(inputSelector);
+  const menu = card.querySelector(menuSelector);
+  if (!btn || !target || !menu) return;
+
+  function addMenuOption(label, onClick, extraClass = '') {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = `directory-option ${extraClass}`.trim();
+    option.textContent = label;
+    option.addEventListener('click', () => {
+      onClick();
+      menu.classList.add('hidden');
+    });
+    menu.appendChild(option);
+  }
 
   function renderMenu() {
     menu.innerHTML = '';
-    directoryOptions.forEach((path) => {
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = 'directory-option';
-      option.textContent = path;
-      option.addEventListener('click', () => {
-        target.value = path;
-        menu.classList.add('hidden');
+
+    if (includeAuto) {
+      addMenuOption('auto', () => {
+        target.value = 'auto';
       });
-      menu.appendChild(option);
+    }
+
+    addMenuOption('Browse any path…', () => {
+      const entered = window.prompt('Enter path:', target.value || '');
+      if (entered !== null) {
+        const path = entered.trim();
+        if (path) target.value = path;
+      }
+    }, 'manual-option');
+
+    directoryOptions.forEach((path) => {
+      addMenuOption(path, () => {
+        target.value = path;
+      });
     });
   }
 
@@ -87,8 +87,11 @@ function createNewJobCard(prefill = {}, insertAfterNode = null) {
   const node = template.content.firstElementChild.cloneNode(true);
   node.querySelector('input[name="jobs_id"]').value = prefill.jobs_id || makeJobsId();
   node.querySelector('select[name="haps_platform"]').value = prefill.haps_platform || 'BJ-HAPS80';
-  node.querySelector('input[name="bitfile"]').value = prefill.bitfile && prefill.bitfile !== 'GET_LATEST' ? prefill.bitfile : '';
+  node.querySelector('input[name="database_path"]').value = prefill.database_path || 'auto';
+  node.querySelector('input[name="reset_script"]').value = prefill.reset_script || 'auto';
+  node.querySelector('input[name="imgload_script"]').value = prefill.imgload_script || 'auto';
   node.querySelector('input[name="binfile"]').value = prefill.binfile || '';
+  node.querySelector('input[name="img_file"]').value = prefill.img_file || '';
   node.querySelector('input[name="log_path"]').value = prefill.log_path || '';
 
   const openocdCfg = prefill.openocd_cfg || {};
@@ -98,14 +101,17 @@ function createNewJobCard(prefill = {}, insertAfterNode = null) {
   (prefill.uart_paths || ['']).forEach((val) => addUartItem(node, val));
 
   node.querySelector('.add-uart-btn').addEventListener('click', () => addUartItem(node));
-  node.querySelector('.minus-btn').addEventListener('click', () => {
+  node.querySelector('.delete-btn').addEventListener('click', () => {
     node.remove();
     if (!newJobsList.children.length) createNewJobCard();
   });
-  node.querySelector('.plus-btn').addEventListener('click', () => createNewJobCard({}, node));
+  node.querySelector('.add-btn').addEventListener('click', () => createNewJobCard({}, node));
 
-  bindBitfileLogic(node, prefill);
-  bindBinfileBrowse(node);
+  bindPathBrowse(node, '.browse-btn', '.binfile-path', '.binfile-menu', false);
+  bindPathBrowse(node, '.img-file-browse-btn', '.img-file-path', '.img-file-menu', false);
+  bindPathBrowse(node, '.database-browse-btn', '.database-path', '.database-menu');
+  bindPathBrowse(node, '.reset-browse-btn', '.reset-script-path', '.reset-menu');
+  bindPathBrowse(node, '.imgload-browse-btn', '.imgload-script-path', '.imgload-menu');
 
   if (insertAfterNode && insertAfterNode.parentNode === newJobsList) {
     insertAfterNode.insertAdjacentElement('afterend', node);
@@ -117,13 +123,14 @@ function createNewJobCard(prefill = {}, insertAfterNode = null) {
 function collectNewJobs() {
   return Array.from(newJobsList.querySelectorAll('.job-card')).map((card) => {
     const uartPaths = Array.from(card.querySelectorAll('.uart-input')).map((i) => i.value.trim()).filter(Boolean);
-    const bitfileMode = card._getBitfileMode ? card._getBitfileMode() : 'path';
     return {
       jobs_id: card.querySelector('input[name="jobs_id"]').value.trim(),
       haps_platform: card.querySelector('select[name="haps_platform"]').value,
-      bitfile_mode: bitfileMode,
-      bitfile: card.querySelector('input[name="bitfile"]').value.trim(),
+      database_path: card.querySelector('input[name="database_path"]').value.trim() || 'auto',
+      reset_script: card.querySelector('input[name="reset_script"]').value.trim() || 'auto',
+      imgload_script: card.querySelector('input[name="imgload_script"]').value.trim() || 'auto',
       binfile: card.querySelector('input[name="binfile"]').value.trim(),
+      img_file: card.querySelector('input[name="img_file"]').value.trim(),
       log_path: card.querySelector('input[name="log_path"]').value.trim(),
       openocd_cfg: {
         tool_path: card.querySelector('input[name="openocd_tool_path"]').value.trim(),
