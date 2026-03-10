@@ -16,7 +16,7 @@
       </div>
       <form id="newJobsForm">
         <div id="newJobsList"></div>
-        <button id="submitBtn" type="submit">Submit</button>
+        <div class="submit-row"><button id="submitBtn" type="submit">Submit</button></div>
       </form>
     </section>
 
@@ -37,24 +37,52 @@
         </select>
       </label>
 
-      <label class="field bitfile-field">
+      <div class="field database-field">
         <span class="key">DataBase</span>
-        <div class="inline-control">
-          <input name="bitfile" class="bitfile-path" placeholder="/path/to/xxx.bit" />
-          <button type="button" class="mini-btn latest-btn">Get Latest</button>
-        </div>
-      </label>
-
-      <label class="field binfile-field">
-        <span class="key">Binfile</span>
-        <div class="inline-control">
-          <input name="binfile" class="binfile-path" placeholder="/path/to/xxx.bin" />
-          <div class="dropdown-wrap">
-            <button type="button" class="mini-btn browse-btn">▾</button>
-            <div class="directory-menu hidden"></div>
+        <div class="stacked">
+          <div class="inline-control">
+            <input name="database_path" class="database-path" placeholder="DataBase Path (auto)" />
+            <div class="dropdown-wrap">
+              <button type="button" class="mini-btn database-browse-btn" title="Browse DataBase path">▾</button>
+              <div class="directory-menu database-menu hidden"></div>
+            </div>
+          </div>
+          <div class="inline-control">
+            <input name="reset_script" class="reset-script-path" placeholder="Reset Script Path (auto)" />
+            <div class="dropdown-wrap">
+              <button type="button" class="mini-btn reset-browse-btn" title="Browse reset script path">▾</button>
+              <div class="directory-menu reset-menu hidden"></div>
+            </div>
+          </div>
+          <div class="inline-control">
+            <input name="imgload_script" class="imgload-script-path" placeholder="ImgLoad Script Path (auto)" />
+            <div class="dropdown-wrap">
+              <button type="button" class="mini-btn imgload-browse-btn" title="Browse imgload script path">▾</button>
+              <div class="directory-menu imgload-menu hidden"></div>
+            </div>
           </div>
         </div>
-      </label>
+      </div>
+
+      <div class="field binfile-field">
+        <span class="key">Binfile</span>
+        <div class="stacked">
+          <div class="inline-control">
+            <input name="binfile" class="binfile-path" placeholder="/path/to/xxx.bin" />
+            <div class="dropdown-wrap">
+              <button type="button" class="mini-btn browse-btn" title="Browse binfile path">▾</button>
+              <div class="directory-menu binfile-menu hidden"></div>
+            </div>
+          </div>
+          <div class="inline-control">
+            <input name="img_file" class="img-file-path" placeholder="IMG File path" />
+            <div class="dropdown-wrap">
+              <button type="button" class="mini-btn img-file-browse-btn" title="Browse IMG file path">▾</button>
+              <div class="directory-menu img-file-menu hidden"></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <label class="field"><span class="key">Log Path</span><input name="log_path" placeholder="/tmp/job.log" /></label>
 
@@ -67,13 +95,13 @@
       </div>
 
       <div class="field uart-field">
-        <button type="button" class="key key-btn add-uart-btn">UART +</button>
+        <button type="button" class="key key-btn add-uart-btn">UART</button>
         <div class="uart-list"></div>
       </div>
 
       <div class="row-actions">
-        <button class="minus-btn" type="button" title="Delete item">-</button>
-        <button class="plus-btn" type="button" title="Add next item">+</button>
+        <button class="delete-btn" type="button" title="Delete item">×</button>
+        <button class="add-btn" type="button" title="Add next item">+</button>
       </div>
     </div>
   </template>
@@ -81,7 +109,7 @@
   <template id="uartTemplate">
     <div class="uart-item">
       <input class="uart-input" placeholder="/dev/ttyUSB0" />
-      <button type="button" class="remove-uart-btn">-</button>
+      <button type="button" class="remove-uart-btn">×</button>
     </div>
   </template>
 
