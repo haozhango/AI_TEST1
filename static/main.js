@@ -84,23 +84,18 @@ async function browseViaFileSystem(target, mode = 'file') {
   modal.overlay.dataset.targetInput = target.name || target.className;
 
   const render = async (path) => {
-    modal.list.innerHTML = 'Loading...';
+    modal.list.textContent = 'Loading...';
     const data = await loadFsEntries(path || target.value || '', mode);
     modal.pathInput.value = data.cwd;
+    modal.list.innerHTML = '';
 
-    const items = [];
-    if (data.parent) {
-      items.push(`<button type="button" class="fs-item fs-nav" data-path="${data.parent}" data-type="directory">..</button>`);
-    }
-
-    data.entries.forEach((entry) => {
-      const icon = entry.type === 'directory' ? '📁' : '📄';
-      items.push(`<button type="button" class="fs-item" data-path="${entry.path}" data-type="${entry.type}">${icon} ${entry.name}</button>`);
-    });
-
-    modal.list.innerHTML = items.join('') || '<div class="fs-empty">(empty)</div>';
-
-    modal.list.querySelectorAll('.fs-item').forEach((item) => {
+    const addEntryButton = (name, pathValue, type, className = 'fs-item') => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = className;
+      item.dataset.path = pathValue;
+      item.dataset.type = type;
+      item.textContent = name;
       item.addEventListener('click', async () => {
         const itemPath = item.dataset.path || '';
         const itemType = item.dataset.type;
@@ -111,13 +106,32 @@ async function browseViaFileSystem(target, mode = 'file') {
         target.value = itemPath;
         modal.close();
       });
+      modal.list.appendChild(item);
+    };
+
+    if (data.parent) addEntryButton('..', data.parent, 'directory', 'fs-item fs-nav');
+
+    data.entries.forEach((entry) => {
+      const icon = entry.type === 'directory' ? '📁' : '📄';
+      addEntryButton(`${icon} ${entry.name}`, entry.path, entry.type);
     });
+
+    if (!data.entries.length && !data.parent) {
+      const empty = document.createElement('div');
+      empty.className = 'fs-empty';
+      empty.textContent = '(empty)';
+      modal.list.appendChild(empty);
+    }
   };
 
   try {
     await render(target.value);
   } catch (error) {
-    modal.list.innerHTML = `<div class="fs-error">Failed: ${error.message}</div>`;
+    modal.list.innerHTML = '';
+    const errorNode = document.createElement('div');
+    errorNode.className = 'fs-error';
+    errorNode.textContent = `Failed: ${error.message}`;
+    modal.list.appendChild(errorNode);
   }
 }
 
