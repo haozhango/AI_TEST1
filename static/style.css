@@ -87,31 +87,4 @@ button { padding: 9px 12px; border: none; border-radius: 7px; cursor: pointer; b
 .jobid-kv .jobid-val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .dropdown-wrap { position: relative; }
-.directory-menu {
-  position: absolute;
-  top: 42px;
-  right: 0;
-  z-index: 20;
-  background: #fff;
-  border: 1px solid #c9cfdb;
-  border-radius: 6px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
-  min-width: 260px;
-  max-height: 200px;
-  overflow: auto;
-}
-.directory-option {
-  display: block;
-  width: 100%;
-  border-radius: 0;
-  border: none;
-  background: #fff;
-  color: #111;
-  text-align: left;
-  font-weight: 500;
-  padding: 8px 10px;
-}
-.directory-option:hover { background: #eef5ff; }
-.hidden { display: none; }
-
 .browse-btn, .database-browse-btn, .reset-browse-btn, .imgload-browse-btn, .img-file-browse-btn { min-width: 38px; padding: 8px 10px; font-size: 16px; font-weight: 800; }

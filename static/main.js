@@ -4,7 +4,6 @@ const uartTemplate = document.getElementById('uartTemplate');
 const recentJobs = document.getElementById('recentJobs');
 const form = document.getElementById('newJobsForm');
 let currentUser = 'user';
-let directoryOptions = [];
 
 function makeJobsId() {
   const now = new Date();
@@ -22,57 +21,46 @@ function addUartItem(card, value = '') {
   uartList.appendChild(item);
 }
 
-function closeAllDirectoryMenus() {
-  document.querySelectorAll('.directory-menu').forEach((menu) => menu.classList.add('hidden'));
+async function browseViaFileSystem(target, mode = 'file') {
+  if (mode === 'directory' && window.showDirectoryPicker) {
+    try {
+      const handle = await window.showDirectoryPicker();
+      target.value = handle.name;
+      return;
+    } catch (_) {
+      return;
+    }
+  }
+
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({ multiple: false });
+      if (handle) target.value = handle.name;
+      return;
+    } catch (_) {
+      return;
+    }
+  }
+
+  const chooser = document.createElement('input');
+  chooser.type = 'file';
+  if (mode === 'directory') chooser.setAttribute('webkitdirectory', '');
+  chooser.addEventListener('change', () => {
+    if (!chooser.files || !chooser.files.length) return;
+    const file = chooser.files[0];
+    target.value = file.webkitRelativePath || file.name;
+  });
+  chooser.click();
 }
 
-function bindPathBrowse(card, btnSelector, inputSelector, menuSelector, includeAuto = true) {
+function bindFileSystemBrowse(card, btnSelector, inputSelector, mode = 'file') {
   const btn = card.querySelector(btnSelector);
   const target = card.querySelector(inputSelector);
-  const menu = card.querySelector(menuSelector);
-  if (!btn || !target || !menu) return;
+  if (!btn || !target) return;
 
-  function addMenuOption(label, onClick, extraClass = '') {
-    const option = document.createElement('button');
-    option.type = 'button';
-    option.className = `directory-option ${extraClass}`.trim();
-    option.textContent = label;
-    option.addEventListener('click', () => {
-      onClick();
-      menu.classList.add('hidden');
-    });
-    menu.appendChild(option);
-  }
-
-  function renderMenu() {
-    menu.innerHTML = '';
-
-    if (includeAuto) {
-      addMenuOption('auto', () => {
-        target.value = 'auto';
-      });
-    }
-
-    directoryOptions.forEach((path) => {
-      addMenuOption(path, () => {
-        target.value = path;
-      });
-    });
-  }
-
-  renderMenu();
-
-  btn.addEventListener('click', (event) => {
-    event.stopPropagation();
-    const hidden = menu.classList.contains('hidden');
-    closeAllDirectoryMenus();
-    if (hidden) {
-      renderMenu();
-      menu.classList.remove('hidden');
-    }
+  btn.addEventListener('click', async () => {
+    await browseViaFileSystem(target, mode);
   });
-
-  menu.addEventListener('click', (event) => event.stopPropagation());
 }
 
 function createNewJobCard(prefill = {}, insertAfterNode = null) {
@@ -99,11 +87,11 @@ function createNewJobCard(prefill = {}, insertAfterNode = null) {
   });
   node.querySelector('.add-btn').addEventListener('click', () => createNewJobCard({}, node));
 
-  bindPathBrowse(node, '.browse-btn', '.binfile-path', '.binfile-menu', false);
-  bindPathBrowse(node, '.img-file-browse-btn', '.img-file-path', '.img-file-menu', false);
-  bindPathBrowse(node, '.database-browse-btn', '.database-path', '.database-menu');
-  bindPathBrowse(node, '.reset-browse-btn', '.reset-script-path', '.reset-menu');
-  bindPathBrowse(node, '.imgload-browse-btn', '.imgload-script-path', '.imgload-menu');
+  bindFileSystemBrowse(node, '.browse-btn', '.binfile-path', 'file');
+  bindFileSystemBrowse(node, '.img-file-browse-btn', '.img-file-path', 'file');
+  bindFileSystemBrowse(node, '.database-browse-btn', '.database-path', 'directory');
+  bindFileSystemBrowse(node, '.reset-browse-btn', '.reset-script-path', 'file');
+  bindFileSystemBrowse(node, '.imgload-browse-btn', '.imgload-script-path', 'file');
 
   if (insertAfterNode && insertAfterNode.parentNode === newJobsList) {
     insertAfterNode.insertAdjacentElement('afterend', node);
@@ -198,18 +186,10 @@ async function refreshRecentJobs() {
 }
 
 async function bootstrap() {
-  document.addEventListener('click', closeAllDirectoryMenus);
   try {
     const sessionResp = await fetch('/api/session');
     if (sessionResp.ok) currentUser = (await sessionResp.json()).user || 'user';
   } catch (_) {}
-
-  try {
-    const dirResp = await fetch('/api/directories');
-    if (dirResp.ok) directoryOptions = (await dirResp.json()).directories || [];
-  } catch (_) {
-    directoryOptions = [];
-  }
 
   createNewJobCard();
   refreshRecentJobs();
