@@ -7,6 +7,14 @@ const form = document.getElementById('newJobsForm');
 const jobsDurationMinutes = document.getElementById('jobsDurationMinutes');
 const autoFinishEnabled = document.getElementById('autoFinishEnabled');
 let currentUser = 'user';
+function apiFetch(url, options = {}) {
+  const opts = { ...options };
+  const headers = new Headers(options.headers || {});
+  if (currentUser) headers.set('X-Linux-User', currentUser);
+  opts.headers = headers;
+  return fetch(url, opts);
+}
+
 
 function makeJobsId() {
   const now = new Date();
@@ -99,7 +107,7 @@ async function loadFsEntriesWithFallback(path, mode) {
 
 async function loadFsEntries(path, mode) {
   const url = `/api/fs?path=${encodeURIComponent(path || '')}&mode=${encodeURIComponent(mode)}`;
-  const response = await fetch(url);
+  const response = await apiFetch(url);
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || 'load failed');
@@ -323,7 +331,7 @@ function collectNewJobs() {
 
 async function submitJobs(event) {
   event.preventDefault();
-  const response = await fetch('/api/jobs', {
+  const response = await apiFetch('/api/jobs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jobs: collectNewJobs() }),
@@ -338,7 +346,7 @@ async function submitJobs(event) {
 
 async function finishJob(jobId) {
   if (!window.confirm('Finish this running job?')) return;
-  const response = await fetch(`/api/jobs/${jobId}/stop`, { method: 'POST' });
+  const response = await apiFetch(`/api/jobs/${jobId}/stop`, { method: 'POST' });
   if (!response.ok) return alert('Finish failed');
   refreshRecentJobs();
   refreshWaitingJobs();
@@ -355,7 +363,7 @@ function formatWait(seconds) {
 }
 
 async function cancelWaitingJob(waitingId) {
-  const response = await fetch(`/api/waiting-jobs/${waitingId}?user_id=${encodeURIComponent(currentUser)}`, { method: 'DELETE' });
+  const response = await apiFetch(`/api/waiting-jobs/${waitingId}`, { method: 'DELETE' });
   if (!response.ok) return alert(`Cancel failed: ${await response.text()}`);
   refreshWaitingJobs();
 }
@@ -398,7 +406,7 @@ function renderWaitingJobs(jobs) {
 }
 
 async function refreshWaitingJobs() {
-  const response = await fetch('/api/waiting-jobs');
+  const response = await apiFetch('/api/waiting-jobs');
   if (!response.ok) return;
   const data = await response.json();
   renderWaitingJobs(data.jobs || []);
@@ -430,7 +438,7 @@ function renderRecentJobs(jobs) {
     copyBtn.addEventListener('click', () => createNewJobCard(payload, null, { regenerateJobsId: true }));
     actions.appendChild(copyBtn);
 
-    if (job.status === 'Runing') {
+    if (job.status === 'Runing' && (payload.user_id || '') === currentUser) {
       const finishBtn = document.createElement('button');
       finishBtn.textContent = 'Finish';
       finishBtn.className = 'finish-btn';
@@ -451,7 +459,7 @@ function renderRecentJobs(jobs) {
 }
 
 async function refreshRecentJobs() {
-  const response = await fetch('/api/jobs');
+  const response = await apiFetch('/api/jobs');
   if (!response.ok) return;
   const data = await response.json();
   renderRecentJobs(data.jobs || []);
