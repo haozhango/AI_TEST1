@@ -408,6 +408,19 @@ def get_system_user(request: Request | None = None) -> str:
             if value:
                 return value
 
+    # Prefer login-session env from privilege escalation wrappers when present.
+    sudo_user = (os.getenv("SUDO_USER") or "").strip()
+    if sudo_user:
+        return sudo_user
+
+    for uid_key in ("PKEXEC_UID", "SUDO_UID"):
+        uid_text = (os.getenv(uid_key) or "").strip()
+        if uid_text.isdigit():
+            try:
+                return pwd.getpwuid(int(uid_text)).pw_name
+            except KeyError:
+                pass
+
     try:
         user = os.getlogin().strip()
         if user:
@@ -415,7 +428,7 @@ def get_system_user(request: Request | None = None) -> str:
     except OSError:
         pass
 
-    for key in ("LOGNAME", "USER", "USERNAME"):
+    for key in ("LOGNAME", "USER", "LNAME", "USERNAME"):
         user = (os.getenv(key) or "").strip()
         if user:
             return user
