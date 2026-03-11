@@ -130,7 +130,8 @@ class JobManager:
         rc = job.process.wait()
         with self._lock:
             current = self._jobs.get(job_id)
-            if not current or current.status == "Stopped":
+            # If timeout/manual handlers already finalized this job, preserve that status.
+            if not current or current.status != "Runing":
                 return
             current.end_time = datetime.now().isoformat(timespec="seconds")
             if rc == 0:
