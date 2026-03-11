@@ -1,6 +1,7 @@
 const newJobsList = document.getElementById('newJobsList');
 const template = document.getElementById('newJobTemplate');
 const uartTemplate = document.getElementById('uartTemplate');
+const waitingJobs = document.getElementById('waitingJobs');
 const recentJobs = document.getElementById('recentJobs');
 const form = document.getElementById('newJobsForm');
 const jobsDurationMinutes = document.getElementById('jobsDurationMinutes');
@@ -315,6 +316,7 @@ function collectNewJobs() {
       uart_paths: uartPaths,
       duration_minutes: Number.parseInt(jobsDurationMinutes.value, 10) || 10,
       auto_finish: autoFinishEnabled.checked,
+      user_id: currentUser,
     };
   });
 }
@@ -331,6 +333,7 @@ async function submitJobs(event) {
   initJobsTimingSettings();
   createNewJobCard();
   refreshRecentJobs();
+  refreshWaitingJobs();
 }
 
 async function finishJob(jobId) {
@@ -338,6 +341,67 @@ async function finishJob(jobId) {
   const response = await fetch(`/api/jobs/${jobId}/stop`, { method: 'POST' });
   if (!response.ok) return alert('Finish failed');
   refreshRecentJobs();
+  refreshWaitingJobs();
+}
+
+
+function formatWait(seconds) {
+  const safe = Math.max(0, Number(seconds) || 0);
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = safe % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  return `${m}m ${s}s`;
+}
+
+async function cancelWaitingJob(waitingId) {
+  const response = await fetch(`/api/waiting-jobs/${waitingId}?user_id=${encodeURIComponent(currentUser)}`, { method: 'DELETE' });
+  if (!response.ok) return alert(`Cancel failed: ${await response.text()}`);
+  refreshWaitingJobs();
+}
+
+function renderWaitingJobs(jobs) {
+  waitingJobs.innerHTML = '';
+  if (!jobs.length) return (waitingJobs.textContent = 'No waiting jobs');
+
+  jobs.forEach((job) => {
+    const payload = job.payload || {};
+    const item = document.createElement('div');
+    item.className = 'recent-card row-grid waiting-card';
+    item.innerHTML = `
+      <div class="kv"><span class="key">JobsID</span><span class="val">${payload.jobs_id || '-'}</span></div>
+      <div class="kv"><span class="key">HAPS Platform</span><span class="val">${payload.haps_platform || '-'}</span></div>
+      <div class="kv"><span class="key">Wait Time</span><span class="val">${formatWait(job.wait_seconds)}</span></div>
+      <div class="kv"><span class="key">Running User</span><span class="val">${job.running_user_id || '-'}</span></div>
+      <div class="actions waiting-actions"></div>
+    `;
+
+    const actions = item.querySelector('.waiting-actions');
+    if ((payload.user_id || '') === currentUser) {
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'waiting-del-btn';
+      delBtn.textContent = 'del';
+      delBtn.addEventListener('click', () => cancelWaitingJob(job.id));
+      actions.appendChild(delBtn);
+    }
+
+    if (job.overdue) {
+      const note = document.createElement('div');
+      note.className = 'job-alert';
+      note.textContent = `Queue time reached. Running job is not finished, you can contact user: ${job.running_user_id || '-'}.`;
+      item.appendChild(note);
+    }
+
+    waitingJobs.appendChild(item);
+  });
+}
+
+async function refreshWaitingJobs() {
+  const response = await fetch('/api/waiting-jobs');
+  if (!response.ok) return;
+  const data = await response.json();
+  renderWaitingJobs(data.jobs || []);
 }
 
 function renderRecentJobs(jobs) {
@@ -351,6 +415,8 @@ function renderRecentJobs(jobs) {
     item.innerHTML = `
       <div class="kv jobid-kv"><span class="key">JobsID</span><span class="val jobid-val">${payload.jobs_id || '-'}</span></div>
       <div class="kv status-kv"><span class="key">Status</span><span class="val status ${job.status}">${job.status}</span></div>
+      <div class="kv"><span class="key">HAPS Platform</span><span class="val">${payload.haps_platform || '-'}</span></div>
+      <div class="kv"><span class="key">Duration</span><span class="val">${payload.duration_minutes || 0} min</span></div>
       <div class="kv"><span class="key">Endtime</span><span class="val">${job.end_time || '-'}</span></div>
       <div class="kv"><span class="key">Log Info</span><span class="val">${payload.log_info || '-'}</span></div>
       <div class="actions"></div>
@@ -400,7 +466,8 @@ async function bootstrap() {
   initJobsTimingSettings();
   createNewJobCard();
   refreshRecentJobs();
-  setInterval(refreshRecentJobs, 2000);
+  refreshWaitingJobs();
+  setInterval(() => { refreshRecentJobs(); refreshWaitingJobs(); }, 2000);
 }
 
 form.addEventListener('submit', submitJobs);
