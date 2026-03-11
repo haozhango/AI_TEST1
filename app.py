@@ -6,7 +6,7 @@ import subprocess
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -56,15 +56,24 @@ class JobRecord:
     process: subprocess.Popen[str] | None = field(default=None, repr=False)
 
 
+@dataclass
+class WaitingJobRecord:
+    id: str
+    payload: dict[str, Any]
+    submit_time: str
+
+
 class JobManager:
     MAX_RECENT_JOBS = 10
 
     def __init__(self) -> None:
         self._jobs: dict[str, JobRecord] = {}
         self._order: list[str] = []
+        self._waiting_jobs: dict[str, WaitingJobRecord] = {}
+        self._waiting_order: list[str] = []
         self._lock = threading.Lock()
 
-    def submit(self, payload: dict[str, Any]) -> JobRecord:
+    def _start_job(self, payload: dict[str, Any]) -> JobRecord:
         now = datetime.now().isoformat(timespec="seconds")
         job = JobRecord(
             id=str(uuid.uuid4()),
@@ -92,13 +101,88 @@ class JobManager:
         )
         job.process = process
 
-        with self._lock:
-            self._jobs[job.id] = job
-            self._order.insert(0, job.id)
-            self._prune_jobs_locked()
+        self._jobs[job.id] = job
+        self._order.insert(0, job.id)
+        self._prune_jobs_locked()
 
         threading.Thread(target=self._watch_job, args=(job.id,), daemon=True).start()
         return job
+
+
+    @staticmethod
+    def _duration_minutes(payload: dict[str, Any]) -> int:
+        try:
+            return max(0, int(payload.get("duration_minutes") or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
+    def _active_running_for_platform(jobs: dict[str, JobRecord], order: list[str], platform: str) -> JobRecord | None:
+        for job_id in order:
+            job = jobs.get(job_id)
+            if not job or job.status != "Runing":
+                continue
+            if (job.payload or {}).get("haps_platform") == platform:
+                return job
+        return None
+
+    def submit(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            self._apply_timeouts_locked()
+            self._promote_waiting_locked()
+
+            user_id = str(payload.get("user_id") or "user")
+            platform = str(payload.get("haps_platform") or "")
+            running = self._active_running_for_platform(self._jobs, self._order, platform)
+            if running:
+                if any((self._waiting_jobs[jid].payload or {}).get("user_id") == user_id for jid in self._waiting_order if jid in self._waiting_jobs):
+                    raise ValueError("same user can only have one waiting job")
+                waiting = WaitingJobRecord(
+                    id=str(uuid.uuid4()),
+                    payload=payload,
+                    submit_time=datetime.now().isoformat(timespec="seconds"),
+                )
+                self._waiting_jobs[waiting.id] = waiting
+                self._waiting_order.append(waiting.id)
+                return {"type": "waiting", "job": self._waiting_to_api(waiting)}
+
+            job = self._start_job(payload)
+            return {"type": "running", "job": self._to_api(job)}
+
+    def _promote_waiting_locked(self) -> None:
+        promoted = True
+        while promoted:
+            promoted = False
+            for waiting_id in list(self._waiting_order):
+                waiting = self._waiting_jobs.get(waiting_id)
+                if not waiting:
+                    continue
+                platform = str((waiting.payload or {}).get("haps_platform") or "")
+                running = self._active_running_for_platform(self._jobs, self._order, platform)
+                if running:
+                    continue
+                self._waiting_jobs.pop(waiting_id, None)
+                self._waiting_order = [jid for jid in self._waiting_order if jid != waiting_id]
+                self._start_job(waiting.payload)
+                promoted = True
+                break
+
+    def cancel_waiting(self, waiting_id: str, user_id: str) -> bool:
+        with self._lock:
+            waiting = self._waiting_jobs.get(waiting_id)
+            if not waiting:
+                raise KeyError(waiting_id)
+            if str((waiting.payload or {}).get("user_id") or "") != user_id:
+                raise PermissionError("can only cancel own waiting job")
+            self._waiting_jobs.pop(waiting_id, None)
+            self._waiting_order = [jid for jid in self._waiting_order if jid != waiting_id]
+            return True
+
+    def list_waiting_jobs(self) -> list[dict[str, Any]]:
+        with self._lock:
+            self._apply_timeouts_locked()
+            self._promote_waiting_locked()
+            return [self._waiting_to_api(self._waiting_jobs[job_id]) for job_id in self._waiting_order if job_id in self._waiting_jobs]
 
     @staticmethod
     def _build_job_command(payload: dict[str, Any]) -> str:
@@ -109,7 +193,7 @@ class JobManager:
         UI selected a longer auto-finish duration (for example 10 minutes).
         """
         try:
-            duration_minutes = int(payload.get("duration_minutes") or 0)
+            duration_minutes = JobManager._duration_minutes(payload)
         except (TypeError, ValueError):
             duration_minutes = 0
 
@@ -137,9 +221,11 @@ class JobManager:
             if rc == 0:
                 current.status = "Finish"
                 current.message = "job finished"
+                self._promote_waiting_locked()
             else:
                 current.status = "Failed"
                 current.message = f"job failed (exit={rc})"
+                self._promote_waiting_locked()
 
     def stop(self, job_id: str) -> JobRecord:
         with self._lock:
@@ -163,6 +249,7 @@ class JobManager:
             job.status = "Finish"
             job.end_time = datetime.now().isoformat(timespec="seconds")
             job.message = "job manually finished"
+            self._promote_waiting_locked()
             return job
 
     def _finish_running_job_locked(self, job: JobRecord, message: str) -> None:
@@ -185,7 +272,7 @@ class JobManager:
             if not job or job.status != "Runing":
                 continue
             payload = job.payload or {}
-            duration_minutes = int(payload.get("duration_minutes") or 0)
+            duration_minutes = self._duration_minutes(payload)
             if duration_minutes <= 0:
                 continue
             try:
@@ -203,6 +290,7 @@ class JobManager:
     def list_jobs(self) -> list[dict[str, Any]]:
         with self._lock:
             self._apply_timeouts_locked()
+            self._promote_waiting_locked()
             self._prune_jobs_locked()
             return [self._to_api(self._jobs[job_id]) for job_id in self._order]
 
@@ -215,6 +303,59 @@ class JobManager:
         for job_id in overflow:
             self._jobs.pop(job_id, None)
         del self._order[self.MAX_RECENT_JOBS :]
+
+
+    def _estimate_waiting_schedule(self, waiting_id: str) -> tuple[datetime | None, JobRecord | None]:
+        waiting = self._waiting_jobs.get(waiting_id)
+        if not waiting:
+            return None, None
+        platform = str((waiting.payload or {}).get("haps_platform") or "")
+        now = datetime.now()
+
+        start_time: datetime | None = None
+        running = self._active_running_for_platform(self._jobs, self._order, platform)
+        current_running = running
+        if running:
+            try:
+                running_submit = datetime.fromisoformat(running.submit_time)
+            except ValueError:
+                running_submit = now
+            running_duration = self._duration_minutes(running.payload)
+            running_end = running_submit + timedelta(minutes=running_duration) if running_duration > 0 else running_submit
+            start_time = max(now, running_end)
+
+        for qid in self._waiting_order:
+            queued = self._waiting_jobs.get(qid)
+            if not queued or qid == waiting_id:
+                if qid == waiting_id:
+                    break
+                continue
+            if str((queued.payload or {}).get("haps_platform") or "") != platform:
+                continue
+            q_duration = self._duration_minutes(queued.payload)
+            duration_delta = timedelta(minutes=q_duration)
+            if start_time is None:
+                start_time = now + duration_delta
+            else:
+                start_time = start_time + duration_delta
+
+        return start_time, current_running
+
+    def _waiting_to_api(self, waiting: WaitingJobRecord) -> dict[str, Any]:
+        start_time, running = self._estimate_waiting_schedule(waiting.id)
+        now = datetime.now()
+        wait_seconds = max(0, int((start_time - now).total_seconds())) if start_time else 0
+        overdue = bool(start_time and now >= start_time and running and running.status == "Runing")
+        return {
+            "id": waiting.id,
+            "submit_time": waiting.submit_time,
+            "payload": waiting.payload,
+            "estimated_start_time": start_time.isoformat(timespec="seconds") if start_time else None,
+            "wait_seconds": wait_seconds,
+            "running_user_id": ((running.payload or {}).get("user_id") if running else None),
+            "running_job_id": (running.id if running else None),
+            "overdue": overdue,
+        }
 
     @staticmethod
     def _to_api(job: JobRecord) -> dict[str, Any]:
@@ -348,8 +489,12 @@ def submit_jobs(request: SubmitJobsRequest) -> dict[str, Any]:
         data = json.loads(item.model_dump_json())
         data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""))
         data["log_info"] = build_log_info(data.get("log_path", ""))
-
-        created.append(manager._to_api(manager.submit(data)))
+        data["user_id"] = str(data.get("user_id") or os.getenv("USER") or "user")
+        try:
+            result = manager.submit(data)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        created.append(result)
 
     return {"created": created}
 
@@ -361,3 +506,19 @@ def stop_job(job_id: str) -> dict[str, Any]:
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="job not found") from exc
     return manager._to_api(job)
+
+
+@app.get("/api/waiting-jobs")
+def get_waiting_jobs() -> dict[str, Any]:
+    return {"jobs": manager.list_waiting_jobs()}
+
+
+@app.delete("/api/waiting-jobs/{waiting_id}")
+def cancel_waiting_job(waiting_id: str, user_id: str) -> dict[str, bool]:
+    try:
+        manager.cancel_waiting(waiting_id, user_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="waiting job not found") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return {"ok": True}
