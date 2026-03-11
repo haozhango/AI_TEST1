@@ -179,4 +179,4 @@ button { padding: 9px 12px; border: none; border-radius: 7px; cursor: pointer; b
 .fs-item:hover { background: #e2e8f0; }
 .fs-empty, .fs-error { padding: 8px; color: #6b7280; }
 
-.waiting-del-btn { background: transparent; color: #dc2626; font-weight: 700; padding: 0; }
+.waiting-del-btn { font-size: 18px; line-height: 1; min-height: auto; }

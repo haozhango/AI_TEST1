@@ -39,6 +39,7 @@ class JobInput(BaseModel):
     uart_paths: list[str] = Field(default_factory=list)
     duration_minutes: int = 0
     auto_finish: bool = True
+    user_id: str = ""
 
 
 class SubmitJobsRequest(BaseModel):
@@ -390,10 +391,10 @@ def build_log_info(log_path: str) -> str:
         preview += f" ... (+{len(files)-3} more)"
     return f"{directory}: {preview}"
 
-def build_jobs_id(jobs_id: str) -> str:
+def build_jobs_id(jobs_id: str, user_id: str = "") -> str:
     if jobs_id.strip():
         return jobs_id
-    user = os.getenv("USER") or "user"
+    user = (user_id or "").strip() or os.getenv("USER") or "user"
     ts = datetime.now().strftime("%y%m%d%H%M%S")
     return f"{user}_{ts}"
 
@@ -487,9 +488,9 @@ def submit_jobs(request: SubmitJobsRequest) -> dict[str, Any]:
     created: list[dict[str, Any]] = []
     for item in request.jobs:
         data = json.loads(item.model_dump_json())
-        data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""))
-        data["log_info"] = build_log_info(data.get("log_path", ""))
         data["user_id"] = str(data.get("user_id") or os.getenv("USER") or "user")
+        data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""), data["user_id"])
+        data["log_info"] = build_log_info(data.get("log_path", ""))
         try:
             result = manager.submit(data)
         except ValueError as exc:
