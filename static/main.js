@@ -7,8 +7,6 @@ const form = document.getElementById('newJobsForm');
 const jobsDurationMinutes = document.getElementById('jobsDurationMinutes');
 const autoFinishEnabled = document.getElementById('autoFinishEnabled');
 let currentUser = 'user';
-const BROWSER_USER_KEY = 'job_console_browser_user';
-
 function apiFetch(url, options = {}) {
   const opts = { ...options };
   const headers = new Headers(options.headers || {});
@@ -468,20 +466,10 @@ async function refreshRecentJobs() {
 }
 
 async function bootstrap() {
-  let suggestedUser = 'user';
   try {
     const sessionResp = await fetch('/api/session');
-    if (sessionResp.ok) suggestedUser = (await sessionResp.json()).user || 'user';
+    if (sessionResp.ok) currentUser = (await sessionResp.json()).user || 'user';
   } catch (_) {}
-
-  const savedUser = (window.localStorage.getItem(BROWSER_USER_KEY) || '').trim();
-  if (savedUser) {
-    currentUser = savedUser;
-  } else {
-    const input = window.prompt('请输入当前浏览器用户名（用于提交 user_id）', suggestedUser) || '';
-    currentUser = input.trim() || suggestedUser || 'user';
-    window.localStorage.setItem(BROWSER_USER_KEY, currentUser);
-  }
 
   initJobsTimingSettings();
   createNewJobCard();
