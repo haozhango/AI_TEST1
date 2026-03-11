@@ -380,7 +380,7 @@ function renderWaitingJobs(jobs) {
     if ((payload.user_id || '') === currentUser) {
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
-      delBtn.className = 'waiting-del-btn delete-btn';
+      delBtn.className = 'delete-btn';
       delBtn.textContent = '×';
       delBtn.addEventListener('click', () => cancelWaitingJob(job.id));
       actions.appendChild(delBtn);

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import pwd
 import subprocess
 import threading
 import uuid
@@ -10,7 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -399,6 +400,32 @@ def build_jobs_id(jobs_id: str, user_id: str = "") -> str:
     return f"{user}_{ts}"
 
 
+def get_system_user(request: Request | None = None) -> str:
+    """Resolve user id from request headers first, then Linux account info."""
+    if request is not None:
+        for key in ("x-linux-user", "x-remote-user", "remote-user", "x-user", "x-auth-request-user"):
+            value = (request.headers.get(key) or "").strip()
+            if value:
+                return value
+
+    try:
+        user = os.getlogin().strip()
+        if user:
+            return user
+    except OSError:
+        pass
+
+    for key in ("LOGNAME", "USER", "USERNAME"):
+        user = (os.getenv(key) or "").strip()
+        if user:
+            return user
+
+    try:
+        return pwd.getpwuid(os.getuid()).pw_name
+    except KeyError:
+        return "user"
+
+
 app = FastAPI(title="HAPS Jobs Console Platform")
 app.mount("/static", StaticFiles(directory=APP_ROOT / "static"), name="static")
 manager = JobManager()
@@ -412,8 +439,8 @@ def index() -> FileResponse:
 
 
 @app.get("/api/session")
-def get_session() -> dict[str, str]:
-    return {"user": os.getenv("USER") or "user"}
+def get_session(request: Request) -> dict[str, str]:
+    return {"user": get_system_user(request)}
 
 
 
@@ -481,14 +508,15 @@ def get_jobs() -> dict[str, Any]:
 
 
 @app.post("/api/jobs")
-def submit_jobs(request: SubmitJobsRequest) -> dict[str, Any]:
-    if not request.jobs:
+def submit_jobs(payload: SubmitJobsRequest, request: Request) -> dict[str, Any]:
+    if not payload.jobs:
         raise HTTPException(status_code=400, detail="jobs cannot be empty")
 
     created: list[dict[str, Any]] = []
-    for item in request.jobs:
+    system_user = get_system_user(request)
+    for item in payload.jobs:
         data = json.loads(item.model_dump_json())
-        data["user_id"] = str(data.get("user_id") or os.getenv("USER") or "user")
+        data["user_id"] = str(data.get("user_id") or system_user)
         data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""), data["user_id"])
         data["log_info"] = build_log_info(data.get("log_path", ""))
         try:
