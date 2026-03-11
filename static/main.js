@@ -363,7 +363,7 @@ function formatWait(seconds) {
 }
 
 async function cancelWaitingJob(waitingId) {
-  const response = await apiFetch(`/api/waiting-jobs/${waitingId}`, { method: 'DELETE' });
+  const response = await apiFetch(`/api/waiting-jobs/${waitingId}?user_id=${encodeURIComponent(currentUser)}`, { method: 'DELETE' });
   if (!response.ok) return alert(`Cancel failed: ${await response.text()}`);
   refreshWaitingJobs();
 }
