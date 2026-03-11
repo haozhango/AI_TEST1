@@ -438,7 +438,7 @@ function renderRecentJobs(jobs) {
     copyBtn.addEventListener('click', () => createNewJobCard(payload, null, { regenerateJobsId: true }));
     actions.appendChild(copyBtn);
 
-    if (job.status === 'Runing') {
+    if (job.status === 'Runing' && (payload.user_id || '') === currentUser) {
       const finishBtn = document.createElement('button');
       finishBtn.textContent = 'Finish';
       finishBtn.className = 'finish-btn';

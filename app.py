@@ -229,13 +229,16 @@ class JobManager:
                 current.message = f"job failed (exit={rc})"
                 self._promote_waiting_locked()
 
-    def stop(self, job_id: str) -> JobRecord:
+    def stop(self, job_id: str, user_id: str) -> JobRecord:
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
                 raise KeyError(job_id)
             if job.status != "Runing":
                 return job
+            owner = str((job.payload or {}).get("user_id") or "")
+            if owner and owner != user_id:
+                raise PermissionError("can only stop own running job")
             process = job.process
 
         if process and process.poll() is None:
@@ -529,7 +532,7 @@ def submit_jobs(payload: SubmitJobsRequest, request: Request) -> dict[str, Any]:
     system_user = get_system_user(request)
     for item in payload.jobs:
         data = json.loads(item.model_dump_json())
-        data["user_id"] = str(data.get("user_id") or system_user)
+        data["user_id"] = system_user
         data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""), data["user_id"])
         data["log_info"] = build_log_info(data.get("log_path", ""))
         try:
@@ -542,11 +545,14 @@ def submit_jobs(payload: SubmitJobsRequest, request: Request) -> dict[str, Any]:
 
 
 @app.post("/api/jobs/{job_id}/stop")
-def stop_job(job_id: str) -> dict[str, Any]:
+def stop_job(job_id: str, request: Request) -> dict[str, Any]:
+    user_id = get_system_user(request)
     try:
-        job = manager.stop(job_id)
+        job = manager.stop(job_id, user_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="job not found") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return manager._to_api(job)
 
 
@@ -556,7 +562,8 @@ def get_waiting_jobs() -> dict[str, Any]:
 
 
 @app.delete("/api/waiting-jobs/{waiting_id}")
-def cancel_waiting_job(waiting_id: str, user_id: str) -> dict[str, bool]:
+def cancel_waiting_job(waiting_id: str, request: Request) -> dict[str, bool]:
+    user_id = get_system_user(request)
     try:
         manager.cancel_waiting(waiting_id, user_id)
     except KeyError as exc:
