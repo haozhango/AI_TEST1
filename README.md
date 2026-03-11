@@ -61,7 +61,7 @@ sudo apt install -y python3 python3-venv python3-pip
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install fastapi uvicorn
+pip install -r requirements.txt
 ```
 
 ### 4) 启动服务
@@ -86,6 +86,16 @@ curl http://127.0.0.1:8000/api/jobs
 
 正常会返回 JSON，例如：`{"jobs":[]}`。
 
+### 7) 接口验证（当前容器无外网时）
+
+如果容器无法联网安装依赖，可先执行离线校验脚本验证 `/api/session` 接口逻辑：
+
+```bash
+python scripts/validate_session_api.py
+```
+
+脚本会在缺少 `fastapi/pydantic` 时使用本地 stub 进行导入与接口函数验证。
+
 ---
 
 ## 常见问题
@@ -100,7 +110,7 @@ curl http://127.0.0.1:8000/api/jobs
 
 ```bash
 source .venv/bin/activate
-pip install fastapi uvicorn
+pip install -r requirements.txt
 ```
 
 ### Q3: 局域网其它机器访问不到
