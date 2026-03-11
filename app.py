@@ -37,6 +37,8 @@ class JobInput(BaseModel):
     log_path: str = ""
     openocd_cfg: OpenOcdCfgInput = Field(default_factory=OpenOcdCfgInput)
     uart_paths: list[str] = Field(default_factory=list)
+    duration_minutes: int = 0
+    auto_finish: bool = True
 
 
 class SubmitJobsRequest(BaseModel):
@@ -141,8 +143,44 @@ class JobManager:
             job.message = "job manually finished"
             return job
 
+    def _finish_running_job_locked(self, job: JobRecord, message: str) -> None:
+        process = job.process
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        job.status = "Finish"
+        job.end_time = datetime.now().isoformat(timespec="seconds")
+        job.message = message
+
+    def _apply_timeouts_locked(self) -> None:
+        now = datetime.now()
+        for job_id in list(self._order):
+            job = self._jobs.get(job_id)
+            if not job or job.status != "Runing":
+                continue
+            payload = job.payload or {}
+            duration_minutes = int(payload.get("duration_minutes") or 0)
+            if duration_minutes <= 0:
+                continue
+            try:
+                submit_at = datetime.fromisoformat(job.submit_time)
+            except ValueError:
+                continue
+            elapsed_seconds = (now - submit_at).total_seconds()
+            if elapsed_seconds < duration_minutes * 60:
+                continue
+            if payload.get("auto_finish", True):
+                self._finish_running_job_locked(job, "job auto finished on timeout")
+            else:
+                job.message = "timeout reached, pending finish"
+
     def list_jobs(self) -> list[dict[str, Any]]:
         with self._lock:
+            self._apply_timeouts_locked()
             self._prune_jobs_locked()
             return [self._to_api(self._jobs[job_id]) for job_id in self._order]
 

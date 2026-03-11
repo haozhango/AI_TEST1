@@ -3,6 +3,8 @@ const template = document.getElementById('newJobTemplate');
 const uartTemplate = document.getElementById('uartTemplate');
 const recentJobs = document.getElementById('recentJobs');
 const form = document.getElementById('newJobsForm');
+const jobsDurationMinutes = document.getElementById('jobsDurationMinutes');
+const autoFinishEnabled = document.getElementById('autoFinishEnabled');
 let currentUser = 'user';
 
 function makeJobsId() {
@@ -281,6 +283,13 @@ function createNewJobCard(prefill = {}, insertAfterNode = null, options = {}) {
   }
 }
 
+function initJobsTimingSettings() {
+  const options = [];
+  for (let value = 10; value <= 240; value += 10) options.push(value);
+  jobsDurationMinutes.innerHTML = options.map((value) => `<option value="${value}">${value} min</option>`).join('');
+  jobsDurationMinutes.value = '10';
+}
+
 function collectNewJobs() {
   return Array.from(newJobsList.querySelectorAll('.job-card')).map((card) => {
     const uartPaths = Array.from(card.querySelectorAll('.uart-input')).map((i) => i.value.trim()).filter(Boolean);
@@ -304,6 +313,8 @@ function collectNewJobs() {
         cfg_file: card.querySelector('input[name="openocd_cfg_file"]').value.trim(),
       },
       uart_paths: uartPaths,
+      duration_minutes: Number.parseInt(jobsDurationMinutes.value, 10) || 10,
+      auto_finish: autoFinishEnabled.checked,
     };
   });
 }
@@ -317,6 +328,7 @@ async function submitJobs(event) {
   });
   if (!response.ok) return alert(`Submit failed: ${await response.text()}`);
   newJobsList.innerHTML = '';
+  initJobsTimingSettings();
   createNewJobCard();
   refreshRecentJobs();
 }
@@ -361,6 +373,13 @@ function renderRecentJobs(jobs) {
       actions.appendChild(finishBtn);
     }
 
+    if (job.status === 'Runing' && String(job.message || '').includes('pending finish')) {
+      const alert = document.createElement('div');
+      alert.className = 'job-alert';
+      alert.textContent = 'Time is up: this Running Job is waiting for manual Finish.';
+      item.appendChild(alert);
+    }
+
     recentJobs.appendChild(item);
   });
 }
@@ -378,6 +397,7 @@ async function bootstrap() {
     if (sessionResp.ok) currentUser = (await sessionResp.json()).user || 'user';
   } catch (_) {}
 
+  initJobsTimingSettings();
   createNewJobCard();
   refreshRecentJobs();
   setInterval(refreshRecentJobs, 2000);

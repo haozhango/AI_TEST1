@@ -17,7 +17,19 @@ h1, h2 { margin: 0 0 12px; }
 .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 
 #newJobsForm { display: flex; flex-direction: column; gap: 10px; }
-.submit-row { display: flex; justify-content: flex-end; }
+.submit-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap; }
+.timing-setting { min-width: 260px; display: inline-flex; align-items: center; gap: 8px; }
+.timing-label {
+  font-weight: 700;
+  color: #1f2937;
+  white-space: nowrap;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+.auto-finish-setting { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 4px; font-size: 14px; }
+.auto-finish-setting input { width: 16px; min-height: 16px; height: 16px; margin: 0; }
+.job-alert { margin-top: 6px; padding: 8px; border-radius: 6px; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; font-size: 13px; }
 
 .job-card, .recent-card { border: 1px solid #d8dde8; border-radius: 10px; padding: 12px; margin-bottom: 10px; background: #fff; }
 .row-grid {

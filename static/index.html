@@ -16,7 +16,17 @@
       </div>
       <form id="newJobsForm">
         <div id="newJobsList"></div>
-        <div class="submit-row"><button id="submitBtn" type="submit">Submit</button></div>
+        <div class="submit-row">
+          <label class="timing-setting">
+            <span class="timing-label">Jobs Duration</span>
+            <select id="jobsDurationMinutes"></select>
+          </label>
+          <label class="auto-finish-setting">
+            <input id="autoFinishEnabled" type="checkbox" checked />
+            <span>Auto Finish on timeout</span>
+          </label>
+          <button id="submitBtn" type="submit">Submit</button>
+        </div>
       </form>
     </section>
 
