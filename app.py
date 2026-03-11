@@ -74,7 +74,7 @@ class JobManager:
             message="job started",
         )
 
-        command = "python3 -c \"import time; time.sleep(20); print('job done')\""
+        command = self._build_job_command(payload)
 
         log_path = payload.get("log_path", "").strip()
         if log_path:
@@ -99,6 +99,27 @@ class JobManager:
 
         threading.Thread(target=self._watch_job, args=(job.id,), daemon=True).start()
         return job
+
+    @staticmethod
+    def _build_job_command(payload: dict[str, Any]) -> str:
+        """
+        Build a demo command that keeps running long enough for timeout logic to take effect.
+
+        Previously this was hard-coded to 20s, which made jobs finish quickly even when the
+        UI selected a longer auto-finish duration (for example 10 minutes).
+        """
+        try:
+            duration_minutes = int(payload.get("duration_minutes") or 0)
+        except (TypeError, ValueError):
+            duration_minutes = 0
+
+        if duration_minutes <= 0:
+            sleep_seconds = 20
+        else:
+            # Add a small buffer so the process won't naturally exit before timeout handling.
+            sleep_seconds = duration_minutes * 60 + 30
+
+        return f"python3 -c \"import time; time.sleep({sleep_seconds}); print('job done')\""
 
     def _watch_job(self, job_id: str) -> None:
         with self._lock:
