@@ -468,7 +468,10 @@ async function refreshRecentJobs() {
 async function bootstrap() {
   try {
     const sessionResp = await fetch('/api/session');
-    if (sessionResp.ok) currentUser = (await sessionResp.json()).user || 'user';
+    if (sessionResp.ok) {
+      const session = await sessionResp.json();
+      currentUser = String(session.uid || session.user || 'user');
+    }
   } catch (_) {}
 
   initJobsTimingSettings();

@@ -425,10 +425,20 @@ def _loginuid_user() -> str | None:
     return _user_from_uid_text(value)
 
 
+def _uid_from_username(user_name: str) -> str | None:
+    name = (user_name or "").strip()
+    if not name:
+        return None
+    try:
+        return str(pwd.getpwnam(name).pw_uid)
+    except KeyError:
+        return None
+
+
 def get_system_user(request: Request | None = None) -> str:
-    """Resolve user id from request headers first, then Linux account info."""
+    """Resolve user name from trusted request headers first, then Linux account info."""
     if request is not None:
-        for key in ("x-linux-user", "x-remote-user", "remote-user", "x-user", "x-auth-request-user"):
+        for key in ("x-remote-user", "remote-user", "x-auth-request-user"):
             value = (request.headers.get(key) or "").strip()
             if value:
                 return value
@@ -465,6 +475,22 @@ def get_system_user(request: Request | None = None) -> str:
         return "user"
 
 
+def get_system_uid(request: Request | None = None) -> str:
+    """Resolve caller uid (numeric string) for multi-user job ownership checks."""
+    if request is not None:
+        for key in ("x-remote-uid", "remote-uid", "x-auth-request-uid"):
+            value = (request.headers.get(key) or "").strip()
+            if value.isdigit():
+                return value
+
+    user_name = get_system_user(request)
+    by_name = _uid_from_username(user_name)
+    if by_name:
+        return by_name
+
+    return str(os.getuid())
+
+
 app = FastAPI(title="HAPS Jobs Console Platform")
 app.mount("/static", StaticFiles(directory=APP_ROOT / "static"), name="static")
 manager = JobManager()
@@ -479,7 +505,7 @@ def index() -> FileResponse:
 
 @app.get("/api/session")
 def get_session(request: Request) -> dict[str, str]:
-    return {"user": get_system_user(request)}
+    return {"user": get_system_user(request), "uid": get_system_uid(request)}
 
 
 
@@ -552,10 +578,10 @@ def submit_jobs(payload: SubmitJobsRequest, request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="jobs cannot be empty")
 
     created: list[dict[str, Any]] = []
-    system_user = get_system_user(request)
+    system_uid = get_system_uid(request)
     for item in payload.jobs:
         data = json.loads(item.model_dump_json())
-        data["user_id"] = system_user
+        data["user_id"] = system_uid
         data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""), data["user_id"])
         data["log_info"] = build_log_info(data.get("log_path", ""))
         try:
@@ -569,7 +595,7 @@ def submit_jobs(payload: SubmitJobsRequest, request: Request) -> dict[str, Any]:
 
 @app.post("/api/jobs/{job_id}/stop")
 def stop_job(job_id: str, request: Request) -> dict[str, Any]:
-    user_id = get_system_user(request)
+    user_id = get_system_uid(request)
     try:
         job = manager.stop(job_id, user_id)
     except KeyError as exc:
@@ -586,7 +612,7 @@ def get_waiting_jobs() -> dict[str, Any]:
 
 @app.delete("/api/waiting-jobs/{waiting_id}")
 def cancel_waiting_job(waiting_id: str, request: Request) -> dict[str, bool]:
-    user_id = get_system_user(request)
+    user_id = get_system_uid(request)
     try:
         manager.cancel_waiting(waiting_id, user_id)
     except KeyError as exc:
