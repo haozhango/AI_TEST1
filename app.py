@@ -403,6 +403,28 @@ def build_jobs_id(jobs_id: str, user_id: str = "") -> str:
     return f"{user}_{ts}"
 
 
+def _user_from_uid_text(uid_text: str) -> str | None:
+    text = (uid_text or "").strip()
+    if not text.isdigit():
+        return None
+    uid = int(text)
+    # 4294967295 means "unset" for Linux loginuid.
+    if uid == 4294967295:
+        return None
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except KeyError:
+        return None
+
+
+def _loginuid_user() -> str | None:
+    try:
+        value = Path("/proc/self/loginuid").read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return _user_from_uid_text(value)
+
+
 def get_system_user(request: Request | None = None) -> str:
     """Resolve user id from request headers first, then Linux account info."""
     if request is not None:
@@ -417,12 +439,13 @@ def get_system_user(request: Request | None = None) -> str:
         return sudo_user
 
     for uid_key in ("PKEXEC_UID", "SUDO_UID"):
-        uid_text = (os.getenv(uid_key) or "").strip()
-        if uid_text.isdigit():
-            try:
-                return pwd.getpwuid(int(uid_text)).pw_name
-            except KeyError:
-                pass
+        user = _user_from_uid_text(os.getenv(uid_key) or "")
+        if user:
+            return user
+
+    login_user = _loginuid_user()
+    if login_user:
+        return login_user
 
     try:
         user = os.getlogin().strip()
