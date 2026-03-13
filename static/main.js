@@ -7,10 +7,101 @@ const form = document.getElementById('newJobsForm');
 const jobsDurationMinutes = document.getElementById('jobsDurationMinutes');
 const autoFinishEnabled = document.getElementById('autoFinishEnabled');
 let currentUser = 'user';
+let detectedLinuxUser = 'user';
+let isUserConfigured = false;
+let adminPassword = '';
+
+async function refreshCurrentUser() {
+  try {
+    const sessionResp = await fetch('/api/session', { cache: 'no-store' });
+    if (!sessionResp.ok) return;
+    const session = await sessionResp.json();
+    const user = String(session.user || '').trim();
+    if (user) detectedLinuxUser = user;
+    if (!isUserConfigured && detectedLinuxUser) currentUser = detectedLinuxUser;
+    console.log(`[session] detected linux user_id: ${detectedLinuxUser}, active user_id: ${currentUser}`);
+  } catch (_) {}
+}
+
+function confirmCurrentUser() {
+  const expected = String(detectedLinuxUser || currentUser || '').trim();
+  if (!expected) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'file-browser-overlay';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <div class="file-browser-modal" style="max-width:520px;">
+        <div class="file-browser-head"><strong>User ID Configuration</strong></div>
+        <div style="padding:12px 0;">Detected Linux username: <b>${expected}</b></div>
+        <div style="padding:0 0 8px 0;">Please enter the user ID to use for this session.</div>
+        <div class="file-browser-path-row">
+          <input class="confirm-user-input" placeholder="Enter user ID" value="${expected}" />
+        </div>
+        <div class="file-browser-path-row">
+          <input class="confirm-admin-pass-input" type="password" placeholder="Admin password (required for super)" />
+        </div>
+        <div class="file-browser-actions">
+          <button type="button" class="mini-btn confirm-user-ok">Confirm</button>
+          <button type="button" class="mini-btn confirm-user-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    const cleanup = () => overlay.remove();
+    const input = overlay.querySelector('.confirm-user-input');
+    const adminInput = overlay.querySelector('.confirm-admin-pass-input');
+    const onOk = () => {
+      const typed = String(input.value || '').trim();
+      if (!typed) {
+        alert('User ID cannot be empty.');
+        input.focus();
+        return;
+      }
+      if (typed === 'super' && !String(adminInput.value || '').trim()) {
+        alert('Admin password is required for super.');
+        adminInput.focus();
+        return;
+      }
+      currentUser = typed;
+      adminPassword = typed === 'super' ? String(adminInput.value || '').trim() : '';
+      isUserConfigured = true;
+      console.log(`[session] configured user_id from popup: ${currentUser}`);
+      cleanup();
+      resolve(true);
+    };
+    const onCancel = () => {
+      alert('User ID configuration was canceled. The page will stop initialization.');
+      cleanup();
+      resolve(false);
+    };
+
+    overlay.querySelector('.confirm-user-ok').addEventListener('click', onOk);
+    overlay.querySelector('.confirm-user-cancel').addEventListener('click', onCancel);
+    const onEnterSubmit = (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        onOk();
+      }
+    };
+    input.addEventListener('keydown', onEnterSubmit);
+    adminInput.addEventListener('keydown', onEnterSubmit);
+
+    document.body.appendChild(overlay);
+    input.focus();
+    input.select();
+  });
+}
+
 function apiFetch(url, options = {}) {
   const opts = { ...options };
   const headers = new Headers(options.headers || {});
   if (currentUser) headers.set('X-Linux-User', currentUser);
+  if (currentUser === 'super' && adminPassword) {
+    headers.set('X-Admin-User', 'super');
+    headers.set('X-Admin-Pass', adminPassword);
+  }
   opts.headers = headers;
   return fetch(url, opts);
 }
@@ -331,10 +422,12 @@ function collectNewJobs() {
 
 async function submitJobs(event) {
   event.preventDefault();
+  const jobsPayload = collectNewJobs();
+  console.log('[submit] submitting jobs with user_id:', Array.from(new Set(jobsPayload.map((job) => job.user_id))));
   const response = await apiFetch('/api/jobs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jobs: collectNewJobs() }),
+    body: JSON.stringify({ jobs: jobsPayload }),
   });
   if (!response.ok) return alert(`Submit failed: ${await response.text()}`);
   newJobsList.innerHTML = '';
@@ -363,7 +456,7 @@ function formatWait(seconds) {
 }
 
 async function cancelWaitingJob(waitingId) {
-  const response = await apiFetch(`/api/waiting-jobs/${waitingId}?user_id=${encodeURIComponent(currentUser)}`, { method: 'DELETE' });
+  const response = await apiFetch(`/api/waiting-jobs/${waitingId}`, { method: 'DELETE' });
   if (!response.ok) return alert(`Cancel failed: ${await response.text()}`);
   refreshWaitingJobs();
 }
@@ -466,16 +559,18 @@ async function refreshRecentJobs() {
 }
 
 async function bootstrap() {
-  try {
-    const sessionResp = await fetch('/api/session');
-    if (sessionResp.ok) currentUser = (await sessionResp.json()).user || 'user';
-  } catch (_) {}
+  await refreshCurrentUser();
+  if (!(await confirmCurrentUser())) return;
 
   initJobsTimingSettings();
   createNewJobCard();
   refreshRecentJobs();
   refreshWaitingJobs();
-  setInterval(() => { refreshRecentJobs(); refreshWaitingJobs(); }, 2000);
+  setInterval(async () => {
+    await refreshCurrentUser();
+    refreshRecentJobs();
+    refreshWaitingJobs();
+  }, 2000);
 }
 
 form.addEventListener('submit', submitJobs);
