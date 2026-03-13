@@ -7,6 +7,17 @@ const form = document.getElementById('newJobsForm');
 const jobsDurationMinutes = document.getElementById('jobsDurationMinutes');
 const autoFinishEnabled = document.getElementById('autoFinishEnabled');
 let currentUser = 'user';
+
+async function refreshCurrentUser() {
+  try {
+    const sessionResp = await fetch('/api/session', { cache: 'no-store' });
+    if (!sessionResp.ok) return;
+    const session = await sessionResp.json();
+    const user = String(session.user || '').trim();
+    if (user) currentUser = user;
+  } catch (_) {}
+}
+
 function apiFetch(url, options = {}) {
   const opts = { ...options };
   const headers = new Headers(options.headers || {});
@@ -331,6 +342,7 @@ function collectNewJobs() {
 
 async function submitJobs(event) {
   event.preventDefault();
+  await refreshCurrentUser();
   const response = await apiFetch('/api/jobs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -363,7 +375,7 @@ function formatWait(seconds) {
 }
 
 async function cancelWaitingJob(waitingId) {
-  const response = await apiFetch(`/api/waiting-jobs/${waitingId}?user_id=${encodeURIComponent(currentUser)}`, { method: 'DELETE' });
+  const response = await apiFetch(`/api/waiting-jobs/${waitingId}`, { method: 'DELETE' });
   if (!response.ok) return alert(`Cancel failed: ${await response.text()}`);
   refreshWaitingJobs();
 }
@@ -466,16 +478,17 @@ async function refreshRecentJobs() {
 }
 
 async function bootstrap() {
-  try {
-    const sessionResp = await fetch('/api/session');
-    if (sessionResp.ok) currentUser = (await sessionResp.json()).user || 'user';
-  } catch (_) {}
+  await refreshCurrentUser();
 
   initJobsTimingSettings();
   createNewJobCard();
   refreshRecentJobs();
   refreshWaitingJobs();
-  setInterval(() => { refreshRecentJobs(); refreshWaitingJobs(); }, 2000);
+  setInterval(async () => {
+    await refreshCurrentUser();
+    refreshRecentJobs();
+    refreshWaitingJobs();
+  }, 2000);
 }
 
 form.addEventListener('submit', submitJobs);
