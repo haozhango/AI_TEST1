@@ -9,6 +9,7 @@ const autoFinishEnabled = document.getElementById('autoFinishEnabled');
 let currentUser = 'user';
 let detectedLinuxUser = 'user';
 let isUserConfigured = false;
+let adminPassword = '';
 
 async function refreshCurrentUser() {
   try {
@@ -38,6 +39,9 @@ function confirmCurrentUser() {
         <div class="file-browser-path-row">
           <input class="confirm-user-input" placeholder="Enter user ID" value="${expected}" />
         </div>
+        <div class="file-browser-path-row">
+          <input class="confirm-admin-pass-input" type="password" placeholder="Admin password (required for super)" />
+        </div>
         <div class="file-browser-actions">
           <button type="button" class="mini-btn confirm-user-ok">Confirm</button>
           <button type="button" class="mini-btn confirm-user-cancel">Cancel</button>
@@ -47,6 +51,7 @@ function confirmCurrentUser() {
 
     const cleanup = () => overlay.remove();
     const input = overlay.querySelector('.confirm-user-input');
+    const adminInput = overlay.querySelector('.confirm-admin-pass-input');
     const onOk = () => {
       const typed = String(input.value || '').trim();
       if (!typed) {
@@ -54,7 +59,13 @@ function confirmCurrentUser() {
         input.focus();
         return;
       }
+      if (typed === 'super' && !String(adminInput.value || '').trim()) {
+        alert('Admin password is required for super.');
+        adminInput.focus();
+        return;
+      }
       currentUser = typed;
+      adminPassword = typed === 'super' ? String(adminInput.value || '').trim() : '';
       isUserConfigured = true;
       console.log(`[session] configured user_id from popup: ${currentUser}`);
       cleanup();
@@ -68,12 +79,14 @@ function confirmCurrentUser() {
 
     overlay.querySelector('.confirm-user-ok').addEventListener('click', onOk);
     overlay.querySelector('.confirm-user-cancel').addEventListener('click', onCancel);
-    input.addEventListener('keydown', (event) => {
+    const onEnterSubmit = (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
         onOk();
       }
-    });
+    };
+    input.addEventListener('keydown', onEnterSubmit);
+    adminInput.addEventListener('keydown', onEnterSubmit);
 
     document.body.appendChild(overlay);
     input.focus();
@@ -85,6 +98,10 @@ function apiFetch(url, options = {}) {
   const opts = { ...options };
   const headers = new Headers(options.headers || {});
   if (currentUser) headers.set('X-Linux-User', currentUser);
+  if (currentUser === 'super' && adminPassword) {
+    headers.set('X-Admin-User', 'super');
+    headers.set('X-Admin-Pass', adminPassword);
+  }
   opts.headers = headers;
   return fetch(url, opts);
 }

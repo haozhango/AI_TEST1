@@ -17,6 +17,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 APP_ROOT = Path(__file__).resolve().parent
+ADMIN_USER = "super"
+ADMIN_PASSWORD = "Eswin888888"
 
 
 class OpenOcdCfgInput(BaseModel):
@@ -169,18 +171,18 @@ class JobManager:
                 promoted = True
                 break
 
-    def cancel_waiting(self, waiting_id: str, user_id: str) -> bool:
+    def cancel_waiting(self, waiting_id: str, user_id: str, is_admin: bool = False) -> bool:
         with self._lock:
             waiting = self._waiting_jobs.get(waiting_id)
             if not waiting:
                 raise KeyError(waiting_id)
-            if str((waiting.payload or {}).get("user_id") or "") != user_id:
+            if not is_admin and str((waiting.payload or {}).get("user_id") or "") != user_id:
                 raise PermissionError("can only cancel own waiting job")
             self._waiting_jobs.pop(waiting_id, None)
             self._waiting_order = [jid for jid in self._waiting_order if jid != waiting_id]
             return True
 
-    def list_waiting_jobs(self, user_id: str) -> list[dict[str, Any]]:
+    def list_waiting_jobs(self, user_id: str, include_all: bool = False) -> list[dict[str, Any]]:
         with self._lock:
             self._apply_timeouts_locked()
             self._promote_waiting_locked()
@@ -188,7 +190,10 @@ class JobManager:
                 self._waiting_to_api(self._waiting_jobs[job_id])
                 for job_id in self._waiting_order
                 if job_id in self._waiting_jobs
-                and str(((self._waiting_jobs[job_id].payload or {}).get("user_id") or "")) == user_id
+                and (
+                    include_all
+                    or str(((self._waiting_jobs[job_id].payload or {}).get("user_id") or "")) == user_id
+                )
             ]
 
     @staticmethod
@@ -234,12 +239,12 @@ class JobManager:
                 current.message = f"job failed (exit={rc})"
                 self._promote_waiting_locked()
 
-    def stop(self, job_id: str, user_id: str) -> JobRecord:
+    def stop(self, job_id: str, user_id: str, is_admin: bool = False) -> JobRecord:
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
                 raise KeyError(job_id)
-            if str((job.payload or {}).get("user_id") or "") != user_id:
+            if not is_admin and str((job.payload or {}).get("user_id") or "") != user_id:
                 raise PermissionError("can only finish own job")
             if job.status != "Runing":
                 return job
@@ -296,7 +301,7 @@ class JobManager:
             else:
                 job.message = "timeout reached, pending finish"
 
-    def list_jobs(self, user_id: str) -> list[dict[str, Any]]:
+    def list_jobs(self, user_id: str, include_all: bool = False) -> list[dict[str, Any]]:
         with self._lock:
             self._apply_timeouts_locked()
             self._promote_waiting_locked()
@@ -304,7 +309,7 @@ class JobManager:
             return [
                 self._to_api(self._jobs[job_id])
                 for job_id in self._order
-                if str(((self._jobs[job_id].payload or {}).get("user_id") or "")) == user_id
+                if include_all or str(((self._jobs[job_id].payload or {}).get("user_id") or "")) == user_id
             ]
 
     def _prune_jobs_locked(self) -> None:
@@ -450,6 +455,13 @@ def get_system_user(request: Request | None = None) -> str:
         return "user"
 
 
+
+
+def is_admin_request(request: Request, user_id: str) -> bool:
+    admin_user = (request.headers.get("x-admin-user") or "").strip()
+    admin_password = (request.headers.get("x-admin-pass") or "").strip()
+    return user_id == ADMIN_USER and admin_user == ADMIN_USER and admin_password == ADMIN_PASSWORD
+
 app = FastAPI(title="HAPS Jobs Console Platform")
 app.mount("/static", StaticFiles(directory=APP_ROOT / "static"), name="static")
 manager = JobManager()
@@ -528,7 +540,8 @@ def get_fs_entries(path: str = "", mode: str = "file") -> dict[str, Any]:
 
 @app.get("/api/jobs")
 def get_jobs(request: Request) -> dict[str, Any]:
-    return {"jobs": manager.list_jobs(get_system_user(request))}
+    user_id = get_system_user(request)
+    return {"jobs": manager.list_jobs(user_id, include_all=is_admin_request(request, user_id))}
 
 
 @app.post("/api/jobs")
@@ -555,8 +568,9 @@ def submit_jobs(payload: SubmitJobsRequest, request: Request) -> dict[str, Any]:
 
 @app.post("/api/jobs/{job_id}/stop")
 def stop_job(job_id: str, request: Request) -> dict[str, Any]:
+    user_id = get_system_user(request)
     try:
-        job = manager.stop(job_id, get_system_user(request))
+        job = manager.stop(job_id, user_id, is_admin=is_admin_request(request, user_id))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="job not found") from exc
     except PermissionError as exc:
@@ -566,13 +580,15 @@ def stop_job(job_id: str, request: Request) -> dict[str, Any]:
 
 @app.get("/api/waiting-jobs")
 def get_waiting_jobs(request: Request) -> dict[str, Any]:
-    return {"jobs": manager.list_waiting_jobs(get_system_user(request))}
+    user_id = get_system_user(request)
+    return {"jobs": manager.list_waiting_jobs(user_id, include_all=is_admin_request(request, user_id))}
 
 
 @app.delete("/api/waiting-jobs/{waiting_id}")
 def cancel_waiting_job(waiting_id: str, request: Request) -> dict[str, bool]:
+    user_id = get_system_user(request)
     try:
-        manager.cancel_waiting(waiting_id, get_system_user(request))
+        manager.cancel_waiting(waiting_id, user_id, is_admin=is_admin_request(request, user_id))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="waiting job not found") from exc
     except PermissionError as exc:
