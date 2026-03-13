@@ -15,6 +15,7 @@ async function refreshCurrentUser() {
     const session = await sessionResp.json();
     const user = String(session.user || '').trim();
     if (user) currentUser = user;
+    console.log(`[session] current linux user_id: ${currentUser}`);
   } catch (_) {}
 }
 
@@ -343,10 +344,12 @@ function collectNewJobs() {
 async function submitJobs(event) {
   event.preventDefault();
   await refreshCurrentUser();
+  const jobsPayload = collectNewJobs();
+  console.log('[submit] submitting jobs with user_id:', Array.from(new Set(jobsPayload.map((job) => job.user_id))));
   const response = await apiFetch('/api/jobs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jobs: collectNewJobs() }),
+    body: JSON.stringify({ jobs: jobsPayload }),
   });
   if (!response.ok) return alert(`Submit failed: ${await response.text()}`);
   newJobsList.innerHTML = '';
