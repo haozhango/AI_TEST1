@@ -21,24 +21,59 @@ async function refreshCurrentUser() {
 
 function confirmCurrentUser() {
   const expected = String(currentUser || '').trim();
-  if (!expected) return true;
+  if (!expected) return Promise.resolve(true);
 
-  while (true) {
-    const input = window.prompt(`当前Linux用户名是: ${expected}
-请输入当前用户名进行确认：`, expected);
-    if (input === null) {
-      alert('已取消用户名确认，页面将停止操作。');
-      return false;
-    }
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'file-browser-overlay';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <div class="file-browser-modal" style="max-width:520px;">
+        <div class="file-browser-head"><strong>用户确认</strong></div>
+        <div style="padding:12px 0;">当前Linux用户名是: <b>${expected}</b></div>
+        <div class="file-browser-path-row">
+          <input class="confirm-user-input" placeholder="请输入当前用户名进行确认" value="${expected}" />
+        </div>
+        <div class="file-browser-actions">
+          <button type="button" class="mini-btn confirm-user-ok">确认</button>
+          <button type="button" class="mini-btn confirm-user-cancel">取消</button>
+        </div>
+      </div>
+    `;
 
-    const typed = String(input || '').trim();
-    if (typed === expected) {
+    const cleanup = () => overlay.remove();
+    const input = overlay.querySelector('.confirm-user-input');
+    const onOk = () => {
+      const typed = String(input.value || '').trim();
+      if (typed !== expected) {
+        alert(`输入用户名不匹配，当前用户应为: ${expected}`);
+        input.focus();
+        input.select();
+        return;
+      }
       console.log(`[session] user confirmation passed: ${typed}`);
-      return true;
-    }
+      cleanup();
+      resolve(true);
+    };
+    const onCancel = () => {
+      alert('已取消用户名确认，页面将停止操作。');
+      cleanup();
+      resolve(false);
+    };
 
-    alert(`输入用户名不匹配，当前用户应为: ${expected}`);
-  }
+    overlay.querySelector('.confirm-user-ok').addEventListener('click', onOk);
+    overlay.querySelector('.confirm-user-cancel').addEventListener('click', onCancel);
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        onOk();
+      }
+    });
+
+    document.body.appendChild(overlay);
+    input.focus();
+    input.select();
+  });
 }
 
 function apiFetch(url, options = {}) {
@@ -504,7 +539,7 @@ async function refreshRecentJobs() {
 
 async function bootstrap() {
   await refreshCurrentUser();
-  if (!confirmCurrentUser()) return;
+  if (!(await confirmCurrentUser())) return;
 
   initJobsTimingSettings();
   createNewJobCard();
