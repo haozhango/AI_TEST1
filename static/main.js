@@ -19,6 +19,28 @@ async function refreshCurrentUser() {
   } catch (_) {}
 }
 
+function confirmCurrentUser() {
+  const expected = String(currentUser || '').trim();
+  if (!expected) return true;
+
+  while (true) {
+    const input = window.prompt(`当前Linux用户名是: ${expected}
+请输入当前用户名进行确认：`, expected);
+    if (input === null) {
+      alert('已取消用户名确认，页面将停止操作。');
+      return false;
+    }
+
+    const typed = String(input || '').trim();
+    if (typed === expected) {
+      console.log(`[session] user confirmation passed: ${typed}`);
+      return true;
+    }
+
+    alert(`输入用户名不匹配，当前用户应为: ${expected}`);
+  }
+}
+
 function apiFetch(url, options = {}) {
   const opts = { ...options };
   const headers = new Headers(options.headers || {});
@@ -482,6 +504,7 @@ async function refreshRecentJobs() {
 
 async function bootstrap() {
   await refreshCurrentUser();
+  if (!confirmCurrentUser()) return;
 
   initJobsTimingSettings();
   createNewJobCard();
