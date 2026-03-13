@@ -29,14 +29,15 @@ function confirmCurrentUser() {
     overlay.style.display = 'flex';
     overlay.innerHTML = `
       <div class="file-browser-modal" style="max-width:520px;">
-        <div class="file-browser-head"><strong>用户确认</strong></div>
-        <div style="padding:12px 0;">当前Linux用户名是: <b>${expected}</b></div>
+        <div class="file-browser-head"><strong>User ID Configuration</strong></div>
+        <div style="padding:12px 0;">Detected Linux username: <b>${expected}</b></div>
+        <div style="padding:0 0 8px 0;">Please enter the user ID to use for this session.</div>
         <div class="file-browser-path-row">
-          <input class="confirm-user-input" placeholder="请输入当前用户名进行确认" value="${expected}" />
+          <input class="confirm-user-input" placeholder="Enter user ID" value="${expected}" />
         </div>
         <div class="file-browser-actions">
-          <button type="button" class="mini-btn confirm-user-ok">确认</button>
-          <button type="button" class="mini-btn confirm-user-cancel">取消</button>
+          <button type="button" class="mini-btn confirm-user-ok">Confirm</button>
+          <button type="button" class="mini-btn confirm-user-cancel">Cancel</button>
         </div>
       </div>
     `;
@@ -45,18 +46,18 @@ function confirmCurrentUser() {
     const input = overlay.querySelector('.confirm-user-input');
     const onOk = () => {
       const typed = String(input.value || '').trim();
-      if (typed !== expected) {
-        alert(`输入用户名不匹配，当前用户应为: ${expected}`);
+      if (!typed) {
+        alert('User ID cannot be empty.');
         input.focus();
-        input.select();
         return;
       }
-      console.log(`[session] user confirmation passed: ${typed}`);
+      currentUser = typed;
+      console.log(`[session] configured user_id from popup: ${currentUser}`);
       cleanup();
       resolve(true);
     };
     const onCancel = () => {
-      alert('已取消用户名确认，页面将停止操作。');
+      alert('User ID configuration was canceled. The page will stop initialization.');
       cleanup();
       resolve(false);
     };
