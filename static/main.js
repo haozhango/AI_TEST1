@@ -7,6 +7,8 @@ const form = document.getElementById('newJobsForm');
 const jobsDurationMinutes = document.getElementById('jobsDurationMinutes');
 const autoFinishEnabled = document.getElementById('autoFinishEnabled');
 let currentUser = 'user';
+let detectedLinuxUser = 'user';
+let isUserConfigured = false;
 
 async function refreshCurrentUser() {
   try {
@@ -14,13 +16,14 @@ async function refreshCurrentUser() {
     if (!sessionResp.ok) return;
     const session = await sessionResp.json();
     const user = String(session.user || '').trim();
-    if (user) currentUser = user;
-    console.log(`[session] current linux user_id: ${currentUser}`);
+    if (user) detectedLinuxUser = user;
+    if (!isUserConfigured && detectedLinuxUser) currentUser = detectedLinuxUser;
+    console.log(`[session] detected linux user_id: ${detectedLinuxUser}, active user_id: ${currentUser}`);
   } catch (_) {}
 }
 
 function confirmCurrentUser() {
-  const expected = String(currentUser || '').trim();
+  const expected = String(detectedLinuxUser || currentUser || '').trim();
   if (!expected) return Promise.resolve(true);
 
   return new Promise((resolve) => {
@@ -52,6 +55,7 @@ function confirmCurrentUser() {
         return;
       }
       currentUser = typed;
+      isUserConfigured = true;
       console.log(`[session] configured user_id from popup: ${currentUser}`);
       cleanup();
       resolve(true);
@@ -401,7 +405,6 @@ function collectNewJobs() {
 
 async function submitJobs(event) {
   event.preventDefault();
-  await refreshCurrentUser();
   const jobsPayload = collectNewJobs();
   console.log('[submit] submitting jobs with user_id:', Array.from(new Set(jobsPayload.map((job) => job.user_id))));
   const response = await apiFetch('/api/jobs', {
