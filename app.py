@@ -541,6 +541,7 @@ def submit_jobs(payload: SubmitJobsRequest, request: Request) -> dict[str, Any]:
     for item in payload.jobs:
         data = json.loads(item.model_dump_json())
         data["user_id"] = str(data.get("user_id") or system_user)
+        print(f"[submit_jobs] received user_id={data['user_id']}", flush=True)
         data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""), data["user_id"])
         data["log_info"] = build_log_info(data.get("log_path", ""))
         try:
