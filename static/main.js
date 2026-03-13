@@ -7,6 +7,75 @@ const form = document.getElementById('newJobsForm');
 const jobsDurationMinutes = document.getElementById('jobsDurationMinutes');
 const autoFinishEnabled = document.getElementById('autoFinishEnabled');
 let currentUser = 'user';
+
+async function refreshCurrentUser() {
+  try {
+    const sessionResp = await fetch('/api/session', { cache: 'no-store' });
+    if (!sessionResp.ok) return;
+    const session = await sessionResp.json();
+    const user = String(session.user || '').trim();
+    if (user) currentUser = user;
+    console.log(`[session] current linux user_id: ${currentUser}`);
+  } catch (_) {}
+}
+
+function confirmCurrentUser() {
+  const expected = String(currentUser || '').trim();
+  if (!expected) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'file-browser-overlay';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <div class="file-browser-modal" style="max-width:520px;">
+        <div class="file-browser-head"><strong>用户确认</strong></div>
+        <div style="padding:12px 0;">当前Linux用户名是: <b>${expected}</b></div>
+        <div class="file-browser-path-row">
+          <input class="confirm-user-input" placeholder="请输入当前用户名进行确认" value="${expected}" />
+        </div>
+        <div class="file-browser-actions">
+          <button type="button" class="mini-btn confirm-user-ok">确认</button>
+          <button type="button" class="mini-btn confirm-user-cancel">取消</button>
+        </div>
+      </div>
+    `;
+
+    const cleanup = () => overlay.remove();
+    const input = overlay.querySelector('.confirm-user-input');
+    const onOk = () => {
+      const typed = String(input.value || '').trim();
+      if (typed !== expected) {
+        alert(`输入用户名不匹配，当前用户应为: ${expected}`);
+        input.focus();
+        input.select();
+        return;
+      }
+      console.log(`[session] user confirmation passed: ${typed}`);
+      cleanup();
+      resolve(true);
+    };
+    const onCancel = () => {
+      alert('已取消用户名确认，页面将停止操作。');
+      cleanup();
+      resolve(false);
+    };
+
+    overlay.querySelector('.confirm-user-ok').addEventListener('click', onOk);
+    overlay.querySelector('.confirm-user-cancel').addEventListener('click', onCancel);
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        onOk();
+      }
+    });
+
+    document.body.appendChild(overlay);
+    input.focus();
+    input.select();
+  });
+}
+
 function apiFetch(url, options = {}) {
   const opts = { ...options };
   const headers = new Headers(options.headers || {});
@@ -331,10 +400,13 @@ function collectNewJobs() {
 
 async function submitJobs(event) {
   event.preventDefault();
+  await refreshCurrentUser();
+  const jobsPayload = collectNewJobs();
+  console.log('[submit] submitting jobs with user_id:', Array.from(new Set(jobsPayload.map((job) => job.user_id))));
   const response = await apiFetch('/api/jobs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jobs: collectNewJobs() }),
+    body: JSON.stringify({ jobs: jobsPayload }),
   });
   if (!response.ok) return alert(`Submit failed: ${await response.text()}`);
   newJobsList.innerHTML = '';
@@ -363,7 +435,7 @@ function formatWait(seconds) {
 }
 
 async function cancelWaitingJob(waitingId) {
-  const response = await apiFetch(`/api/waiting-jobs/${waitingId}?user_id=${encodeURIComponent(currentUser)}`, { method: 'DELETE' });
+  const response = await apiFetch(`/api/waiting-jobs/${waitingId}`, { method: 'DELETE' });
   if (!response.ok) return alert(`Cancel failed: ${await response.text()}`);
   refreshWaitingJobs();
 }
@@ -466,16 +538,18 @@ async function refreshRecentJobs() {
 }
 
 async function bootstrap() {
-  try {
-    const sessionResp = await fetch('/api/session');
-    if (sessionResp.ok) currentUser = (await sessionResp.json()).user || 'user';
-  } catch (_) {}
+  await refreshCurrentUser();
+  if (!(await confirmCurrentUser())) return;
 
   initJobsTimingSettings();
   createNewJobCard();
   refreshRecentJobs();
   refreshWaitingJobs();
-  setInterval(() => { refreshRecentJobs(); refreshWaitingJobs(); }, 2000);
+  setInterval(async () => {
+    await refreshCurrentUser();
+    refreshRecentJobs();
+    refreshWaitingJobs();
+  }, 2000);
 }
 
 form.addEventListener('submit', submitJobs);

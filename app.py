@@ -180,11 +180,16 @@ class JobManager:
             self._waiting_order = [jid for jid in self._waiting_order if jid != waiting_id]
             return True
 
-    def list_waiting_jobs(self) -> list[dict[str, Any]]:
+    def list_waiting_jobs(self, user_id: str) -> list[dict[str, Any]]:
         with self._lock:
             self._apply_timeouts_locked()
             self._promote_waiting_locked()
-            return [self._waiting_to_api(self._waiting_jobs[job_id]) for job_id in self._waiting_order if job_id in self._waiting_jobs]
+            return [
+                self._waiting_to_api(self._waiting_jobs[job_id])
+                for job_id in self._waiting_order
+                if job_id in self._waiting_jobs
+                and str(((self._waiting_jobs[job_id].payload or {}).get("user_id") or "")) == user_id
+            ]
 
     @staticmethod
     def _build_job_command(payload: dict[str, Any]) -> str:
@@ -229,11 +234,13 @@ class JobManager:
                 current.message = f"job failed (exit={rc})"
                 self._promote_waiting_locked()
 
-    def stop(self, job_id: str) -> JobRecord:
+    def stop(self, job_id: str, user_id: str) -> JobRecord:
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
                 raise KeyError(job_id)
+            if str((job.payload or {}).get("user_id") or "") != user_id:
+                raise PermissionError("can only finish own job")
             if job.status != "Runing":
                 return job
             process = job.process
@@ -289,12 +296,16 @@ class JobManager:
             else:
                 job.message = "timeout reached, pending finish"
 
-    def list_jobs(self) -> list[dict[str, Any]]:
+    def list_jobs(self, user_id: str) -> list[dict[str, Any]]:
         with self._lock:
             self._apply_timeouts_locked()
             self._promote_waiting_locked()
             self._prune_jobs_locked()
-            return [self._to_api(self._jobs[job_id]) for job_id in self._order]
+            return [
+                self._to_api(self._jobs[job_id])
+                for job_id in self._order
+                if str(((self._jobs[job_id].payload or {}).get("user_id") or "")) == user_id
+            ]
 
     def _prune_jobs_locked(self) -> None:
         self._order = [job_id for job_id in self._order if job_id in self._jobs]
@@ -516,8 +527,8 @@ def get_fs_entries(path: str = "", mode: str = "file") -> dict[str, Any]:
 
 
 @app.get("/api/jobs")
-def get_jobs() -> dict[str, Any]:
-    return {"jobs": manager.list_jobs()}
+def get_jobs(request: Request) -> dict[str, Any]:
+    return {"jobs": manager.list_jobs(get_system_user(request))}
 
 
 @app.post("/api/jobs")
@@ -530,6 +541,7 @@ def submit_jobs(payload: SubmitJobsRequest, request: Request) -> dict[str, Any]:
     for item in payload.jobs:
         data = json.loads(item.model_dump_json())
         data["user_id"] = str(data.get("user_id") or system_user)
+        print(f"[submit_jobs] received user_id={data['user_id']}", flush=True)
         data["jobs_id"] = build_jobs_id(data.get("jobs_id", ""), data["user_id"])
         data["log_info"] = build_log_info(data.get("log_path", ""))
         try:
@@ -542,23 +554,25 @@ def submit_jobs(payload: SubmitJobsRequest, request: Request) -> dict[str, Any]:
 
 
 @app.post("/api/jobs/{job_id}/stop")
-def stop_job(job_id: str) -> dict[str, Any]:
+def stop_job(job_id: str, request: Request) -> dict[str, Any]:
     try:
-        job = manager.stop(job_id)
+        job = manager.stop(job_id, get_system_user(request))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="job not found") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return manager._to_api(job)
 
 
 @app.get("/api/waiting-jobs")
-def get_waiting_jobs() -> dict[str, Any]:
-    return {"jobs": manager.list_waiting_jobs()}
+def get_waiting_jobs(request: Request) -> dict[str, Any]:
+    return {"jobs": manager.list_waiting_jobs(get_system_user(request))}
 
 
 @app.delete("/api/waiting-jobs/{waiting_id}")
-def cancel_waiting_job(waiting_id: str, user_id: str) -> dict[str, bool]:
+def cancel_waiting_job(waiting_id: str, request: Request) -> dict[str, bool]:
     try:
-        manager.cancel_waiting(waiting_id, user_id)
+        manager.cancel_waiting(waiting_id, get_system_user(request))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="waiting job not found") from exc
     except PermissionError as exc:
